@@ -78,50 +78,109 @@ agrosight/
 
 ```mermaid
 graph TB
-    subgraph Client["Frontend (React + Vite)"]
-        UI["Pages & Components"]
-        AC["AuthContext"]
-        APIJS["api.js / Axios"]
+    subgraph Browser["Browser — React 19 + Vite 8"]
+        direction TB
+        subgraph Pages["Pages"]
+            LP["LandingPage"]
+            LG["LoginPage / RegisterPage"]
+            DB["DashboardPage"]
+            SC["ScanPage"]
+            SR["ScanResultsPage"]
+            HI["HistoryPage"]
+            CH["ChatPage"]
+            PR["ProfilePage"]
+        end
+        subgraph UILayer["Shared UI"]
+            SN["SideNavBar"]
+            TN["TopAppBar"]
+            BN["BottomNavBar"]
+            PR2["ProtectedRoute"]
+        end
+        AC["AuthContext — user, login, logout, register"]
+        APIJS["api.js — Axios instance + interceptors"]
     end
 
-    subgraph Server["Backend (FastAPI)"]
-        AUTH["POST /api/auth"]
-        SCAN["POST /api/scan"]
-        CHAT["POST /api/chat"]
-        DASH["GET /api/dashboard"]
+    subgraph FastAPI["Backend — FastAPI + Uvicorn"]
+        direction TB
+        MW["CORS Middleware"]
+        subgraph Routes["API Routes"]
+            RA["/api/auth — register, login, me, update, delete, OTP"]
+            RS["/api/scan — upload, history, get, delete"]
+            RC["/api/chat — ask, history, clear"]
+            RD["/api/dashboard — stats, report download"]
+        end
+        subgraph Deps["Dependencies"]
+            DEP1["get_current_user — JWT required"]
+            DEP2["get_current_user_optional — JWT optional"]
+        end
+        subgraph Svc["Services"]
+            AIM["AIModelService — ResNet34 inference via run_in_executor"]
+            GEM["ChatService — Gemini 2.5 Flash via run_in_executor"]
+            EMAIL["EmailService — Brevo HTTP API, in-memory OTP store"]
+            DIS["DiseaseInfoService — static treatment lookup"]
+            RPT["Report Builder — ReportLab PDF, openpyxl Excel, csv CSV"]
+        end
+        subgraph Security["Security"]
+            JWT["JWT — python-jose HS256"]
+            PWD["bcrypt — passlib rounds=12"]
+        end
     end
 
-    subgraph Services["Backend Services"]
-        AIM["AIModelService - ResNet34 PyTorch"]
-        GEM["ChatService - Gemini 2.5 Flash"]
-        EMAIL["EmailService - Brevo OTP"]
-        REPORT["Report Builder - PDF / Excel / CSV"]
+    subgraph DB["Persistence — SQLAlchemy async"]
+        direction TB
+        USR[("users table")]
+        SCN[("scans table — image as base64")]
+        CHT[("chat_history table")]
+        ALM["Alembic migrations"]
     end
 
-    subgraph Storage["Persistence"]
-        DB[("SQLite / PostgreSQL")]
-        FS["Local uploads or base64"]
+    subgraph External["External APIs"]
+        GEMAPI["Google Gemini 2.5 Flash"]
+        BREVO["Brevo SMTP API"]
     end
 
-    UI --> AC --> APIJS
-    APIJS -->|"JWT Bearer"| AUTH
-    APIJS --> SCAN
-    APIJS --> CHAT
-    APIJS --> DASH
+    subgraph ML["ML Pipeline — PyTorch"]
+        MDL["ResNet34 — 38 classes"]
+        TRF["transforms — Resize 256, CenterCrop 224, Normalize"]
+        CLS["class_names.json"]
+    end
 
-    SCAN --> AIM
-    SCAN --> GEM
-    SCAN --> DB
-    SCAN --> FS
+    Browser -->|"HTTP + Bearer token"| MW
+    MW --> Routes
+    APIJS --> MW
 
-    CHAT --> GEM
-    CHAT --> DB
+    RA --> JWT
+    RA --> PWD
+    RA --> EMAIL
+    RA --> DEP1
+    RS --> DEP1
+    RS --> DEP2
+    RC --> DEP1
+    RD --> DEP1
 
-    AUTH --> EMAIL
-    AUTH --> DB
+    RS --> AIM
+    RS --> GEM
+    RS --> DIS
+    RS --> DB
 
-    DASH --> DB
-    DASH --> REPORT
+    RC --> GEM
+    RC --> DB
+
+    RD --> RPT
+    RD --> DB
+
+    RA --> DB
+
+    AIM --> ML
+    MDL --> TRF --> CLS
+
+    GEM --> GEMAPI
+    EMAIL --> BREVO
+
+    DB --> USR
+    DB --> SCN
+    DB --> CHT
+    DB --> ALM
 ```
 
 ---
