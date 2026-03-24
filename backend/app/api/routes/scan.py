@@ -5,13 +5,13 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.models.scan import Scan
-from app.schemas.scan import ScanResponse, ScanCreate
+from app.schemas.scan import PredictionResponse, PredictionCreate
 from app.services.ai_model import AIModelService
 from app.services.storage_service import StorageService
 
 router = APIRouter()
 
-@router.post("/upload", response_model=ScanResponse)
+@router.post("/upload", response_model=PredictionResponse)
 async def upload_scan(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -49,7 +49,7 @@ async def upload_scan(
     
     return scan
 
-@router.get("/history", response_model=List[ScanResponse])
+@router.get("/history", response_model=List[PredictionResponse])
 async def get_scan_history(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -63,7 +63,7 @@ async def get_scan_history(
     
     return scans
 
-@router.get("/{scan_id}", response_model=ScanResponse)
+@router.get("/{scan_id}", response_model=PredictionResponse)
 async def get_scan(
     scan_id: int,
     current_user: User = Depends(get_current_user),
