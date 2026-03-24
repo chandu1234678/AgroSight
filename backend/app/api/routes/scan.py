@@ -89,6 +89,9 @@ async def upload_scan(
             confidence=round(raw_confidence, 4),
             severity=severity,
             recommendation=ai_explanation,
+            gradcam_url=f"data:image/jpeg;base64,{gradcam_b64}" if gradcam_b64 else None,
+            affected_area_pct=affected_area_pct,
+            spread_risk_pct=spread_risk_pct,
             created_at=created_at,
         )
         db.add(scan)
@@ -170,6 +173,9 @@ async def get_scan(
         "severity_level": scan.severity,
         "ai_explanation": scan.recommendation,
         "image_url": scan.image_url,
+        "gradcam_url": scan.gradcam_url,
+        "affected_area_pct": scan.affected_area_pct,
+        "spread_risk_pct": scan.spread_risk_pct,
         "created_at": scan.created_at.isoformat() if scan.created_at else None,
     }
 
