@@ -328,6 +328,120 @@ The trained weights go to `ml/saved_models/resnet34_plant_disease_best.pth` and 
 
 ---
 
+## Supported diseases
+
+The model detects 38 conditions across 14 crops (26 diseases + 12 healthy classes).
+
+### Apple — 4 classes
+
+| Class | Description |
+|---|---|
+| Apple Scab | Fungal disease (*Venturia inaequalis*) causing dark, scabby lesions on leaves and fruit. Spreads rapidly in cool, wet spring weather. |
+| Black Rot | Caused by *Botryosphaeria obtusa*. Produces brown leaf spots with purple borders and mummified fruit. Can kill entire branches. |
+| Cedar Apple Rust | Fungal disease (*Gymnosporangium juniperi-virginianae*) requiring two hosts — apple and cedar/juniper. Creates bright orange-yellow spots on leaves. |
+| Healthy | No disease detected. |
+
+### Blueberry — 1 class
+
+| Class | Description |
+|---|---|
+| Healthy | No disease detected. |
+
+### Cherry — 2 classes
+
+| Class | Description |
+|---|---|
+| Powdery Mildew | Caused by *Podosphaera clandestina*. White powdery coating on young leaves and shoots. Stunts growth and reduces fruit quality. |
+| Healthy | No disease detected. |
+
+### Corn (Maize) — 4 classes
+
+| Class | Description |
+|---|---|
+| Cercospora Leaf Spot / Gray Leaf Spot | Caused by *Cercospora zeae-maydis*. Rectangular gray-tan lesions running parallel to leaf veins. One of the most yield-limiting diseases in maize. |
+| Common Rust | Caused by *Puccinia sorghi*. Small, powdery, brick-red pustules on both leaf surfaces. Spreads fast in cool, humid conditions. |
+| Northern Leaf Blight | Caused by *Exserohilum turcicum*. Long, cigar-shaped gray-green lesions. Severe infections can cause significant yield loss. |
+| Healthy | No disease detected. |
+
+### Grape — 4 classes
+
+| Class | Description |
+|---|---|
+| Black Rot | Caused by *Guignardia bidwellii*. Brown leaf lesions with black borders and shriveled, mummified berries. Thrives in warm, wet weather. |
+| Esca (Black Measles) | Complex fungal disease involving multiple pathogens. Causes tiger-stripe leaf patterns and internal wood decay. Can kill vines over time. |
+| Leaf Blight (Isariopsis Leaf Spot) | Caused by *Pseudocercospora vitis*. Dark brown angular spots on older leaves, leading to early defoliation and weakened vines. |
+| Healthy | No disease detected. |
+
+### Orange — 1 class
+
+| Class | Description |
+|---|---|
+| Huanglongbing (Citrus Greening) | Caused by *Candidatus Liberibacter* bacteria spread by the Asian citrus psyllid. Produces blotchy, asymmetric yellowing. Incurable — infected trees must be removed. |
+
+### Peach — 2 classes
+
+| Class | Description |
+|---|---|
+| Bacterial Spot | Caused by *Xanthomonas arboricola*. Water-soaked spots on leaves that turn brown and fall out, leaving a shot-hole appearance. Also affects fruit. |
+| Healthy | No disease detected. |
+
+### Pepper (Bell) — 2 classes
+
+| Class | Description |
+|---|---|
+| Bacterial Spot | Caused by *Xanthomonas campestris*. Small, water-soaked lesions on leaves and fruit that turn brown and scabby. Spreads through rain splash. |
+| Healthy | No disease detected. |
+
+### Potato — 3 classes
+
+| Class | Description |
+|---|---|
+| Early Blight | Caused by *Alternaria solani*. Dark brown concentric ring lesions (target-board pattern) on older leaves. Reduces photosynthesis and tuber yield. |
+| Late Blight | Caused by *Phytophthora infestans* — the same pathogen behind the Irish Potato Famine. Water-soaked lesions that rapidly turn brown-black. Extremely destructive. |
+| Healthy | No disease detected. |
+
+### Raspberry — 1 class
+
+| Class | Description |
+|---|---|
+| Healthy | No disease detected. |
+
+### Soybean — 1 class
+
+| Class | Description |
+|---|---|
+| Healthy | No disease detected. |
+
+### Squash — 1 class
+
+| Class | Description |
+|---|---|
+| Powdery Mildew | Caused by *Podosphaera xanthii* or *Erysiphe cichoracearum*. White powdery patches on leaves and stems. Reduces photosynthesis and fruit quality. |
+
+### Strawberry — 2 classes
+
+| Class | Description |
+|---|---|
+| Leaf Scorch | Caused by *Diplocarpon earlianum*. Small, dark purple spots that enlarge and merge, giving leaves a scorched appearance. Weakens plants over multiple seasons. |
+| Healthy | No disease detected. |
+
+### Tomato — 10 classes
+
+| Class | Description |
+|---|---|
+| Bacterial Spot | Caused by *Xanthomonas* spp. Small, water-soaked spots with yellow halos on leaves and dark, raised spots on fruit. Spreads through rain and irrigation. |
+| Early Blight | Caused by *Alternaria solani*. Dark concentric ring lesions on older leaves, starting from the bottom of the plant upward. |
+| Late Blight | Caused by *Phytophthora infestans*. Irregular, greasy-looking dark lesions on leaves and stems. Can destroy an entire crop within days in wet conditions. |
+| Leaf Mold | Caused by *Passalora fulva*. Yellow patches on upper leaf surface with olive-green mold on the underside. Common in high-humidity greenhouses. |
+| Septoria Leaf Spot | Caused by *Septoria lycopersici*. Numerous small circular spots with dark borders and light centers. Causes rapid defoliation from the bottom up. |
+| Spider Mites / Two-Spotted Spider Mite | Caused by *Tetranychus urticae*. Tiny mites cause stippled, bronzed leaves and fine webbing. Thrives in hot, dry conditions. |
+| Target Spot | Caused by *Corynespora cassiicola*. Concentric ring lesions resembling a target on leaves, stems, and fruit. Favored by warm, humid weather. |
+| Yellow Leaf Curl Virus | Transmitted by whiteflies (*Bemisia tabaci*). Causes severe leaf curling, yellowing, and stunted growth. No cure — infected plants must be removed. |
+| Tomato Mosaic Virus | Caused by *Tomato mosaic virus (ToMV)*. Produces mosaic-patterned light and dark green patches on leaves. Spreads through contact and contaminated tools. |
+| Healthy | No disease detected. |
+
+---
+
 ## Pages
 
 | Route | Description |
