@@ -1,18 +1,15 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.core.config import settings
+"""
+Database session management.
+Uses async SQLAlchemy for production via database.py
+"""
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
+# Import async session utilities from database.py
+from app.database import (
+    async_session_maker,
+    get_db,
+    init_db,
+    close_db,
+    engine,
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def get_db():
-    """Database session dependency."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+__all__ = ["async_session_maker", "get_db", "init_db", "close_db", "engine"]

@@ -1,6 +1,8 @@
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
+# Import this Base in all model files
 Base = declarative_base()
 
-# Import models here for Alembic - but only after Base is defined
-# These imports should happen after Base creation to avoid circular imports
+# NOTE: Don't import models here - it causes circular imports!
+# Alembic auto-discovers models via env.py configuration
+# Each model file imports Base directly: from app.db.base import Base

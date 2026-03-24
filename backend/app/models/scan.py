@@ -1,9 +1,22 @@
+"""
+Scan model (DEPRECATED - use Prediction instead).
+
+This file is kept for backward compatibility.
+New code should use the Prediction model from prediction.py
+"""
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
 
+
 class Scan(Base):
+    """
+    DEPRECATED: Use Prediction model instead.
+    
+    Kept for backward compatibility with existing routes.
+    """
     __tablename__ = "scans"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -16,4 +29,4 @@ class Scan(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    user = relationship("User", back_populates="scans")
+    user = relationship("User", foreign_keys=[user_id])
