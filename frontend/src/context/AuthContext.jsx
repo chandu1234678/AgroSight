@@ -10,33 +10,29 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      // TODO: Fetch user info
+      // Token is automatically added by axios interceptor
       setUser({ token })
     }
     setLoading(false)
   }, [])
 
   const login = async (email, password) => {
-    const formData = new FormData()
-    formData.append('username', email)
-    formData.append('password', password)
-    
-    const response = await api.post('/auth/login', formData)
+    const response = await api.post('/auth/login', { email, password })
     const { access_token } = response.data
     
+    console.log('Login successful, token:', access_token.substring(0, 20) + '...')
     localStorage.setItem('token', access_token)
-    api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
     setUser({ token: access_token })
+    console.log('Token saved to localStorage')
+    return access_token
   }
 
-  const signup = async (email, password) => {
-    await api.post('/auth/signup', { email, password })
+  const signup = async (email, password, name) => {
+    await api.post('/auth/register', { email, password, name })
   }
 
   const logout = () => {
     localStorage.removeItem('token')
-    delete api.defaults.headers.common['Authorization']
     setUser(null)
   }
 

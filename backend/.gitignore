@@ -15,21 +15,23 @@ ENV/
 *.db
 *.sqlite3
 *.db-journal
+agrosight.db
 
 # Environment
 .env
 .env.local
 .env.production
 
-# ML Models & Data
-ml/data/raw/*
-ml/data/processed/*
+# ML Models & Data - Exclude ALL
+ml/data/
+!ml/data/.gitkeep
 ml/saved_models/*.pth
 ml/saved_models/*.onnx
 ml/saved_models/*.pt
+ml/saved_models/*.h5
+ml/saved_models/*.tflite
 !ml/saved_models/.gitkeep
-!ml/data/raw/.gitkeep
-!ml/data/processed/.gitkeep
+!ml/saved_models/class_names.json
 
 # Logs
 *.log
@@ -48,3 +50,8 @@ uploads/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary
+*.tmp
+*.temp
+.cache/

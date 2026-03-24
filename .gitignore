@@ -48,13 +48,18 @@ uploads/
 backend/uploads/*
 !backend/uploads/.gitkeep
 
-# ML Data and Models
-backend/ml/data/raw/*
-backend/ml/data/processed/*
-!backend/ml/data/raw/.gitkeep
-!backend/ml/data/processed/.gitkeep
+# ML Data and Models - Exclude ALL dataset files
+backend/ml/data/
+!backend/ml/data/.gitkeep
 backend/ml/saved_models/*.pth
 backend/ml/saved_models/*.pt
 backend/ml/saved_models/*.onnx
+backend/ml/saved_models/*.h5
+backend/ml/saved_models/*.tflite
 !backend/ml/saved_models/.gitkeep
+!backend/ml/saved_models/class_names.json
 
+# Temporary files
+*.tmp
+*.temp
+.cache/

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List
 from app.api.deps import get_current_user
-from app.db.session import get_db
+from app.database import get_db
 from app.models.user import User
 from app.models.scan import Scan
 from app.schemas.scan import PredictionResponse, PredictionCreate
@@ -15,7 +16,7 @@ router = APIRouter()
 async def upload_scan(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Upload and analyze plant image."""
     # Validate file type
@@ -44,36 +45,41 @@ async def upload_scan(
         recommendation=recommendation
     )
     db.add(scan)
-    db.commit()
-    db.refresh(scan)
+    await db.commit()
+    await db.refresh(scan)
     
     return scan
 
 @router.get("/history", response_model=List[PredictionResponse])
 async def get_scan_history(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 20
 ):
     """Get user's scan history."""
-    scans = db.query(Scan).filter(
-        Scan.user_id == current_user.id
-    ).order_by(Scan.created_at.desc()).offset(skip).limit(limit).all()
-    
+    result = await db.execute(
+        select(Scan)
+        .where(Scan.user_id == current_user.id)
+        .order_by(Scan.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    scans = result.scalars().all()
     return scans
 
 @router.get("/{scan_id}", response_model=PredictionResponse)
 async def get_scan(
     scan_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get specific scan details."""
-    scan = db.query(Scan).filter(
-        Scan.id == scan_id,
-        Scan.user_id == current_user.id
-    ).first()
+    result = await db.execute(
+        select(Scan)
+        .where(Scan.id == scan_id, Scan.user_id == current_user.id)
+    )
+    scan = result.scalars().first()
     
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")

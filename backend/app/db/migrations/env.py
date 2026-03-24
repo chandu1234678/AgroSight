@@ -9,6 +9,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from app.core.config import settings
 from app.db.base import Base
 
+# Import all models so Alembic can detect them
+from app.models import User, Disease, Prediction
+from app.models.chat import ChatHistory
+from app.models.scan import Scan
+
 config = context.config
 config.set_main_option('sqlalchemy.url', settings.DATABASE_URL)
 

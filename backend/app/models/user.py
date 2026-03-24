@@ -26,7 +26,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)  # "John Doe"
+    name = Column(String(255), nullable=True)  # "John Doe" - nullable for optional signup
     email = Column(String(255), unique=True, index=True, nullable=False)  # "john@farm.com"
     hashed_password = Column(String(255), nullable=False)  # Never store plain password!
     is_active = Column(Boolean, default=True, index=True)  # Soft delete
@@ -38,6 +38,17 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="selectin",  # Eager load predictions when fetching user
+    )
+    chat_history = relationship(
+        "ChatHistory",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    scans = relationship(
+        "Scan",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     __table_args__ = (
