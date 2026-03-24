@@ -47,3 +47,14 @@ docker-compose.override.yml
 uploads/
 backend/uploads/*
 !backend/uploads/.gitkeep
+
+# ML Data and Models
+backend/ml/data/raw/*
+backend/ml/data/processed/*
+!backend/ml/data/raw/.gitkeep
+!backend/ml/data/processed/.gitkeep
+backend/ml/saved_models/*.pth
+backend/ml/saved_models/*.pt
+backend/ml/saved_models/*.onnx
+!backend/ml/saved_models/.gitkeep
+

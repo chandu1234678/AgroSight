@@ -1,23 +1,28 @@
-from pydantic import BaseModel
+"""
+Pydantic schemas for the /api/scan endpoints.
+Handles image upload, disease prediction, and history.
+"""
+
+from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
-class ScanCreate(BaseModel):
-    image_url: str
-    disease: str
-    confidence: float
-    severity: Optional[str] = None
-    recommendation: Optional[str] = None
+# Re-export from user.py to keep prediction schemas in one place
+from app.schemas.user import (
+    PredictionCreate,
+    PredictionResponse,
+    UncertainPredictionResponse,
+    PredictionHistoryItem,
+    PredictionHistoryResponse,
+    ErrorResponse,
+)
 
-class ScanResponse(BaseModel):
-    id: int
-    user_id: int
-    image_url: str
-    disease: str
-    confidence: float
-    severity: Optional[str]
-    recommendation: Optional[str]
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
+__all__ = [
+    "PredictionCreate",
+    "PredictionResponse",
+    "UncertainPredictionResponse",
+    "PredictionHistoryItem",
+    "PredictionHistoryResponse",
+    "ErrorResponse",
+]
+

@@ -1,47 +1,76 @@
-"""Security utilities: password hashing and JWT token management."""
+"""
+Security utilities for JWT authentication and password hashing.
+
+Uses:
+- passlib + bcrypt: Password hashing
+- python-jose: JWT token creation/validation
+"""
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Dict
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from app.core.config import settings
-from app.database import get_db
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# HTTP Bearer scheme for JWT
-security = HTTPBearer()
+# Bcrypt context for password hashing
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12  # Increase rounds for security (slower but more resistant to brute force)
+)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against its bcrypt hash."""
+    """
+    Verify a plaintext password against its bcrypt hash.
+    
+    Args:
+        plain_password: User's entered password
+        hashed_password: Stored bcrypt hash from database
+    
+    Returns:
+        True if password matches, False otherwise
+    """
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password using bcrypt."""
+    """
+    Hash a plaintext password with bcrypt.
+    
+    Args:
+        password: Plaintext password to hash
+    
+    Returns:
+        Bcrypt hash string (safe to store in database)
+    """
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: Dict,
+    expires_delta: Optional[timedelta] = None
+) -> str:
     """
-    Create a JWT access token.
+    Create JWT access token.
     
     Args:
-        data: Payload to encode (typically {"sub": user_id})
-        expires_delta: Token expiration time (defaults to settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        data: Payload dictionary (typically {"sub": user_id})
+        expires_delta: Custom expiration time (overrides config)
     
     Returns:
-        Encoded JWT token string
+        JWT token string
+    
+    Example:
+        >>> token = create_access_token({"sub": 123})
+        >>> token
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
     """
     to_encode = data.copy()
     
-    # Calculate expiration time
+    # Set expiration
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -49,8 +78,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     
-    # Add expiration to payload
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
     
     # Encode JWT
     encoded_jwt = jwt.encode(
@@ -61,15 +89,20 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Optional[dict]:
+def decode_access_token(token: str) -> Optional[Dict]:
     """
-    Decode and verify a JWT token.
+    Decode and verify JWT token.
     
     Args:
         token: JWT token string
     
     Returns:
-        Decoded payload dict if valid, None otherwise
+        Payload dictionary if valid, None if invalid/expired
+    
+    Example:
+        >>> payload = decode_access_token(token)
+        >>> if payload:
+        ...     user_id = payload.get("sub")
     """
     try:
         payload = jwt.decode(
@@ -82,50 +115,23 @@ def decode_access_token(token: str) -> Optional[dict]:
         return None
 
 
-async def get_current_user(credentials: HTTPAuthCredentials = Depends(security), db: AsyncSession = Depends(get_db)):
+def extract_user_id_from_token(token: str) -> Optional[int]:
     """
-    Dependency to get current authenticated user from JWT token.
+    Extract user ID from JWT token.
     
-    Usage in routes:
-        @app.get("/me")
-        async def get_profile(current_user: User = Depends(get_current_user)):
-            return current_user
+    Args:
+        token: JWT token string
     
-    Raises:
-        HTTPException: If token is invalid or user not found
+    Returns:
+        User ID if token is valid, None otherwise
     """
-    from app.models import User
-    
-    token = credentials.credentials
-    
-    # Decode token
     payload = decode_access_token(token)
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return None
     
-    # Extract user ID from token
     user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    if not user_id or not isinstance(user_id, int):
+        return None
     
-    # Fetch user from database
-    stmt = select(User).where(User.id == user_id)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    
-    if not user or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return user
+    return user_id
+

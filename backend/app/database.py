@@ -68,7 +68,7 @@ async def init_db():
     Call this once at startup.
     """
     # Import models here to register them with Base.metadata
-    # This must happen before creating tables
+    # This ensures all model definitions are loaded before creating tables
     from app.db.base import Base
     from app.models import User, Prediction, Disease  # noqa: F401
     
