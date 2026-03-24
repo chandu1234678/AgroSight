@@ -1,329 +1,345 @@
-# AgroSight - AI-Powered Plant Disease Detection
+# AgroSight
 
-> A full-stack web application that uses deep learning to identify plant diseases from images, providing farmers with instant diagnosis, treatment recommendations, and an AI chat assistant.
-
-**Technologies:** Python 3.11 | FastAPI | React 18 | PyTorch | Google Gemini | SQLite
+AI-powered plant disease detection platform. Upload a photo of a plant leaf and get an instant diagnosis, treatment recommendations, and an AI explanation — all backed by a ResNet34 model trained on 38 disease classes.
 
 ---
 
-## Overview
+## What it does
 
-AgroSight is a production-ready web application that leverages AI and computer vision to detect plant diseases. Users upload plant images and receive real-time disease predictions with confidence scores, treatment recommendations, and AI-generated explanations. A built-in chat assistant powered by Google Gemini provides ongoing agricultural advice.
-
-### Key Features
-
-- Image-based plant disease detection using a trained ResNet CNN
-- Google Gemini AI for disease explanations and chat assistance
-- User authentication with JWT and OTP-verified password changes
-- Scan history saved per user with delete support
-- Chat history persisted to database per user
-- Analytics dashboard with scan statistics
-- Responsive UI with mobile bottom nav and desktop sidebar
+- Detects 38 plant diseases from a leaf photo using a fine-tuned ResNet34 model
+- Generates a natural-language explanation via Google Gemini 2.5 Flash
+- Provides organic and chemical treatment options per disease
+- Saves scan history to a database when the user is logged in
+- AI chat assistant for open-ended agricultural questions
+- Dashboard with real stats (total scans, diseases detected, healthy %, accuracy)
+- Export scan reports as PDF, Excel, or CSV
+- OTP-based password change flow via email (Brevo)
 
 ---
 
-## System Architecture
+## Tech stack
 
-```mermaid
-graph TB
-    subgraph "Frontend (React + Vite)"
-        A[Landing Page] --> B[Auth Pages]
-        B --> C[Dashboard]
-        C --> D[Scan Page]
-        C --> E[Chat Page]
-        C --> F[History Page]
-        C --> G[Profile Page]
-    end
+**Frontend**
+- React 19 + Vite 8
+- Tailwind CSS v3
+- React Router v7
+- Axios
 
-    subgraph "Backend (FastAPI)"
-        H[Auth Routes] --> I[JWT + OTP]
-        J[Scan Routes] --> K[AI Model Service]
-        L[Chat Routes] --> M[Gemini Service]
-        N[Dashboard Routes] --> O[SQLite DB]
-    end
+**Backend**
+- FastAPI + Uvicorn
+- SQLAlchemy (async) + aiosqlite / asyncpg
+- Alembic migrations
+- JWT authentication (python-jose + passlib)
+- Google Gemini 2.5 Flash (AI explanations + chat)
+- Brevo (email OTP)
+- ReportLab + openpyxl (PDF/Excel export)
 
-    subgraph "ML Layer"
-        P[ResNet Model] --> Q[Disease Classification]
-    end
-
-    D --> J
-    E --> L
-    K --> P
-    I --> O
-    J --> O
-    L --> O
-```
+**ML**
+- PyTorch + torchvision
+- ResNet34 fine-tuned on PlantVillage dataset
+- 38 disease classes across 14 crop types
+- Async inference via `run_in_executor`
 
 ---
 
-## Application Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant Backend
-    participant ResNet
-    participant Gemini
-    participant Database
-
-    User->>Frontend: Upload plant image
-    Frontend->>Backend: POST /api/scan/upload
-    Backend->>ResNet: Run inference
-    ResNet->>Backend: Disease + confidence
-    Backend->>Gemini: Generate explanation
-    Gemini->>Backend: AI explanation text
-    Backend->>Database: Save scan (if logged in)
-    Backend->>Frontend: Full result
-    Frontend->>User: Display diagnosis + chat
-```
-
----
-
-## Technology Stack
-
-### Frontend
-- **React 18** — Component-based UI
-- **Vite** — Build tool and dev server
-- **Tailwind CSS v3** — Utility-first styling
-- **React Router v6** — Client-side routing
-- **Axios** — HTTP client
-- **Context API** — Auth state management
-
-### Backend
-- **FastAPI** — Python web framework
-- **SQLAlchemy (async)** — ORM
-- **Alembic** — Database migrations
-- **Pydantic** — Data validation
-- **PyJWT + Passlib** — Auth and security
-- **Google Gemini API** — AI chat and explanations
-
-### Machine Learning
-- **PyTorch** — Deep learning framework
-- **Torchvision / ResNet** — CNN architecture
-- **Pillow** — Image preprocessing
-
-### Database
-- **SQLite** — Development (file-based)
-- **PostgreSQL** — Production (Docker)
-
----
-
-## Project Structure
+## Project structure
 
 ```
 agrosight/
-│
 ├── backend/
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── deps.py                  # Auth dependency injection
-│   │   │   └── routes/
-│   │   │       ├── auth.py              # Register, login, OTP, profile
-│   │   │       ├── scan.py              # Upload, history, delete
-│   │   │       ├── chat.py              # Ask, history, clear
-│   │   │       └── dashboard.py         # Stats
-│   │   ├── core/
-│   │   │   ├── config.py                # App settings
-│   │   │   └── security.py              # JWT utilities
-│   │   ├── models/
-│   │   │   ├── user.py
-│   │   │   ├── scan.py
-│   │   │   └── chat.py
-│   │   ├── schemas/
-│   │   │   ├── user.py
-│   │   │   ├── scan.py
-│   │   │   └── chat.py
-│   │   ├── services/
-│   │   │   ├── ai_model.py              # ResNet inference
-│   │   │   ├── chat_service.py          # Gemini integration
-│   │   │   ├── disease_info.py          # Treatment data
-│   │   │   └── email_service.py         # OTP email
-│   │   └── db/
-│   │       ├── base.py
-│   │       ├── session.py
-│   │       └── migrations/
-│   │
+│   │   ├── api/routes/       # auth, scan, chat, dashboard
+│   │   ├── core/             # config, security
+│   │   ├── db/               # session, migrations
+│   │   ├── models/           # SQLAlchemy models
+│   │   ├── schemas/          # Pydantic schemas
+│   │   ├── services/         # ai_model, chat_service, email_service
+│   │   └── main.py
 │   ├── ml/
-│   │   ├── training/train.py
-│   │   ├── utils/preprocessing.py
-│   │   ├── data/
-│   │   └── saved_models/
-│   │
+│   │   ├── data/             # raw + processed datasets
+│   │   ├── saved_models/     # trained .pth + class_names.json
+│   │   └── training/         # train.py
 │   ├── requirements.txt
-│   ├── alembic.ini
-│   └── .env
-│
+│   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/
-│   │   │   ├── LandingPage.jsx
-│   │   │   ├── LoginPage.jsx
-│   │   │   ├── RegisterPage.jsx
-│   │   │   ├── DashboardPage.jsx
-│   │   │   ├── ScanPage.jsx
-│   │   │   ├── ScanResultsPage.jsx
-│   │   │   ├── HistoryPage.jsx
-│   │   │   ├── ChatPage.jsx
-│   │   │   └── ProfilePage.jsx
-│   │   ├── components/
-│   │   │   ├── SideNavBar.jsx
-│   │   │   ├── BottomNavBar.jsx
-│   │   │   ├── TopAppBar.jsx
-│   │   │   └── ProtectedRoute.jsx
-│   │   ├── services/
-│   │   │   └── api.js
-│   │   └── context/
-│   │       └── AuthContext.jsx
-│   │
+│   │   ├── components/       # SideNavBar, TopAppBar, BottomNavBar
+│   │   ├── context/          # AuthContext
+│   │   ├── pages/            # all page components
+│   │   └── services/         # api.js (axios)
 │   ├── package.json
-│   └── vite.config.js
-│
-├── docker-compose.yml
-├── .gitignore
-└── README.md
+│   └── Dockerfile
+└── docker-compose.yml
 ```
 
 ---
 
-## Installation and Setup
+## Architecture
+
+```mermaid
+graph TB
+    subgraph Client["Frontend (React + Vite)"]
+        UI[Pages & Components]
+        AC[AuthContext]
+        API[api.js / Axios]
+    end
+
+    subgraph Server["Backend (FastAPI)"]
+        AUTH[/api/auth]
+        SCAN[/api/scan]
+        CHAT[/api/chat]
+        DASH[/api/dashboard]
+    end
+
+    subgraph Services["Backend Services"]
+        AIM[AIModelService<br/>ResNet34 · PyTorch]
+        GEM[ChatService<br/>Gemini 2.5 Flash]
+        EMAIL[EmailService<br/>Brevo OTP]
+        REPORT[Report Builder<br/>PDF · Excel · CSV]
+    end
+
+    subgraph Storage["Persistence"]
+        DB[(SQLite / PostgreSQL<br/>SQLAlchemy async)]
+        FS[Local uploads<br/>or base64 in DB]
+    end
+
+    UI --> AC --> API
+    API -->|JWT Bearer| AUTH
+    API --> SCAN
+    API --> CHAT
+    API --> DASH
+
+    SCAN --> AIM
+    SCAN --> GEM
+    SCAN --> DB
+    SCAN --> FS
+
+    CHAT --> GEM
+    CHAT --> DB
+
+    AUTH --> EMAIL
+    AUTH --> DB
+
+    DASH --> DB
+    DASH --> REPORT
+```
+
+---
+
+## Scan flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as FastAPI
+    participant ML as AIModelService
+    participant Gemini as Gemini 2.5 Flash
+    participant DB as Database
+
+    User->>FE: Upload leaf image
+    FE->>API: POST /api/scan/upload (multipart)
+    API->>ML: predict_sync(image) via run_in_executor
+    ML-->>API: { disease, confidence }
+    API->>Gemini: ask_gemini(explanation_prompt)
+    API->>API: base64 encode image
+    Note over API: Gemini + base64 run in parallel (asyncio.gather)
+    Gemini-->>API: AI explanation text
+    API->>DB: INSERT Scan (if user logged in)
+    DB-->>API: scan_id
+    API-->>FE: diagnosis + explanation + treatments + image_url
+    FE->>User: Show ScanResultsPage
+```
+
+---
+
+## Database schema
+
+```mermaid
+erDiagram
+    USER {
+        int id PK
+        string email
+        string name
+        string hashed_password
+        bool is_active
+        datetime created_at
+    }
+
+    SCAN {
+        int id PK
+        int user_id FK
+        string disease
+        float confidence
+        string severity
+        text recommendation
+        text image_url
+        datetime created_at
+    }
+
+    CHAT {
+        int id PK
+        int user_id FK
+        text query
+        text response
+        datetime timestamp
+    }
+
+    USER ||--o{ SCAN : "has"
+    USER ||--o{ CHAT : "has"
+```
+
+---
+
+## Auth flow (OTP password change)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as FastAPI
+    participant Email as Brevo Email
+
+    User->>FE: Open Edit Profile, enter new password
+    FE->>API: POST /api/auth/send-change-otp
+    API->>Email: Send 6-digit OTP
+    Email-->>User: OTP in inbox
+    User->>FE: Enter OTP
+    FE->>API: POST /api/auth/verify-change-otp { otp }
+    API-->>FE: { change_token } (5 min TTL)
+    FE->>API: PUT /api/auth/me { password, change_token }
+    API-->>FE: Updated user profile
+```
+
+---
+
+## Local setup
 
 ### Prerequisites
 
 - Python 3.11+
 - Node.js 18+
-- Git
+- A trained model file at `backend/ml/saved_models/resnet34_plant_disease_best.pth`
+- `class_names.json` at `backend/ml/saved_models/class_names.json`
 
-### Backend Setup
+### Backend
 
 ```bash
-git clone https://github.com/chandu1234678/AgroSight.git
-cd AgroSight/backend
-
+cd backend
 python -m venv venv
-# Windows
-.\venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Linux/Mac
 
 pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+cp .env.example .env
+# Edit .env — set SECRET_KEY, GEMINI_API_KEY, BREVO_API_KEY
+
+uvicorn app.main:app --reload
 ```
 
-API available at `http://localhost:8000` — docs at `http://localhost:8000/docs`
+API runs at `http://localhost:8000`. Docs at `http://localhost:8000/docs`.
 
-### Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
 npm install
+
+# Create .env.local
+echo "VITE_API_URL=http://localhost:8000" > .env.local
+
 npm run dev
 ```
 
-App available at `http://localhost:5173`
+App runs at `http://localhost:5173`.
 
 ---
 
-## Environment Variables
+## Environment variables
 
-Create `backend/.env`:
+Copy `backend/.env.example` to `backend/.env` and fill in:
 
-```env
-DATABASE_URL=sqlite:///./agrosight.db
+| Variable | Required | Description |
+|---|---|---|
+| `SECRET_KEY` | yes | JWT signing key — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `DATABASE_URL` | yes | SQLite (`sqlite+aiosqlite:///./agrosight.db`) or PostgreSQL |
+| `GEMINI_API_KEY` | yes | Google AI Studio API key |
+| `BREVO_API_KEY` | no | Brevo (Sendinblue) key for OTP emails |
+| `MODEL_PATH` | yes | Path to `.pth` model file |
+| `CLASS_NAMES_PATH` | yes | Path to `class_names.json` |
+| `FRONTEND_URL` | yes | CORS origin (`http://localhost:5173` in dev) |
+| `CONFIDENCE_THRESHOLD` | no | Min confidence to trust prediction (default `0.7`) |
 
-SECRET_KEY=your-secret-key-here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+---
 
-GEMINI_API_KEY=your-gemini-api-key
+## API endpoints
 
-# Email (for OTP)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your@email.com
-SMTP_PASSWORD=your-app-password
+```
+POST   /api/auth/register          Register new user
+POST   /api/auth/login             Login, returns JWT
+GET    /api/auth/me                Get current user
+PUT    /api/auth/me                Update profile (name, email, password)
+DELETE /api/auth/me                Delete account
+POST   /api/auth/send-change-otp   Send OTP to email before password change
+POST   /api/auth/verify-change-otp Verify OTP, returns change_token
+POST   /api/auth/forgot-password   Request password reset OTP
+POST   /api/auth/reset-password    Reset password with token
 
-MODEL_PATH=ml/saved_models/resnet_plant_disease.pth
-CLASS_NAMES_PATH=ml/saved_models/class_names.json
+POST   /api/scan/upload            Upload image, returns diagnosis
+GET    /api/scan/history           Get user's scan history
+GET    /api/scan/{id}              Get single scan
+DELETE /api/scan/{id}              Delete scan
+
+POST   /api/chat/ask               Send message, get AI response
+GET    /api/chat/history           Get chat history
+DELETE /api/chat/history           Clear chat history
+
+GET    /api/dashboard/stats        Get aggregate stats
+GET    /api/dashboard/report/download?format=pdf|excel|csv
 ```
 
 ---
 
-## API Endpoints
-
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Get JWT token |
-| GET | `/api/auth/me` | Current user info |
-| PUT | `/api/auth/me` | Update profile |
-| DELETE | `/api/auth/me` | Delete account |
-| POST | `/api/auth/send-change-otp` | Send OTP for password change |
-| POST | `/api/auth/verify-change-otp` | Verify OTP, get change token |
-| POST | `/api/auth/forgot-password` | Request reset OTP |
-| POST | `/api/auth/reset-password` | Reset with token |
-
-### Scan
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/scan/upload` | Upload image, get diagnosis |
-| GET | `/api/scan/history` | User scan history |
-| GET | `/api/scan/{id}` | Single scan details |
-| DELETE | `/api/scan/{id}` | Delete scan |
-
-### Chat
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/chat/ask` | Ask AI assistant |
-| GET | `/api/chat/history` | Chat history |
-| DELETE | `/api/chat/history` | Clear all history |
-
-### Dashboard
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/dashboard/stats` | User statistics |
-
----
-
-## Docker Deployment
+## Docker
 
 ```bash
 docker-compose up --build
 ```
 
-Starts backend (8000), frontend (5173), and PostgreSQL (5432).
+- Backend: `http://localhost:8000`
+- Frontend: `http://localhost:80`
+
+Make sure to set environment variables in `docker-compose.yml` or via a `.env` file before running in production.
 
 ---
 
-## Troubleshooting
+## ML model
 
-**Port 8000 in use:**
+The model is a ResNet34 fine-tuned on the PlantVillage dataset. It classifies 38 conditions across crops including tomato, potato, apple, corn, grape, pepper, and more.
+
+To train your own:
+
 ```bash
-# Windows
-netstat -ano | findstr :8000
-taskkill /PID <PID> /F
+cd backend
+python ml/training/train.py
 ```
 
-**Database errors:**
-```bash
-rm backend/agrosight.db
-cd backend && alembic upgrade head
-```
-
-**Frontend module errors:**
-```bash
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-```
+The trained weights go to `ml/saved_models/resnet34_plant_disease_best.pth` and the class list to `ml/saved_models/class_names.json`.
 
 ---
 
-## Acknowledgments
+## Pages
 
-- PlantVillage dataset for training data
-- PyTorch team for the deep learning framework
-- Google Gemini for AI capabilities
-- FastAPI community
+| Route | Description |
+|---|---|
+| `/` | Landing page |
+| `/login` | Login |
+| `/register` | Register |
+| `/dashboard` | Stats overview + recent scans + export |
+| `/scan` | Upload plant image |
+| `/scan/results` | Diagnosis result + AI explanation + inline chat |
+| `/scan/:id` | View saved scan |
+| `/history` | Full scan history with filters |
+| `/chat` | AI chat assistant |
+| `/profile` | Edit profile, change password (OTP), delete account |
