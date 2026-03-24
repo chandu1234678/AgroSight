@@ -461,22 +461,9 @@ Contributions are welcome. Please follow these steps:
 
 ---
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## Author
-
-**Chandu**  
-GitHub: [@chandu1234678](https://github.com/chandu1234678)  
-Project: [AgroSight](https://github.com/chandu1234678/AgroSight)
-
----
-
 ## Acknowledgments
 
 - PlantVillage dataset for training data
 - PyTorch team for the deep learning framework
 - FastAPI community for the excellent web framework
+
