@@ -16,7 +16,7 @@ AI-powered plant disease detection platform. Upload a photo of a plant leaf and 
 - OTP-based password change flow via email (Brevo)
 
 ---
-
+    
 ## Tech stack
 
 **Frontend**
@@ -79,35 +79,35 @@ agrosight/
 ```mermaid
 graph TB
     subgraph Client["Frontend (React + Vite)"]
-        UI[Pages & Components]
-        AC[AuthContext]
-        API[api.js / Axios]
+        UI["Pages & Components"]
+        AC["AuthContext"]
+        APIJS["api.js / Axios"]
     end
 
     subgraph Server["Backend (FastAPI)"]
-        AUTH[/api/auth]
-        SCAN[/api/scan]
-        CHAT[/api/chat]
-        DASH[/api/dashboard]
+        AUTH["POST /api/auth"]
+        SCAN["POST /api/scan"]
+        CHAT["POST /api/chat"]
+        DASH["GET /api/dashboard"]
     end
 
     subgraph Services["Backend Services"]
-        AIM[AIModelService<br/>ResNet34 · PyTorch]
-        GEM[ChatService<br/>Gemini 2.5 Flash]
-        EMAIL[EmailService<br/>Brevo OTP]
-        REPORT[Report Builder<br/>PDF · Excel · CSV]
+        AIM["AIModelService - ResNet34 PyTorch"]
+        GEM["ChatService - Gemini 2.5 Flash"]
+        EMAIL["EmailService - Brevo OTP"]
+        REPORT["Report Builder - PDF / Excel / CSV"]
     end
 
     subgraph Storage["Persistence"]
-        DB[(SQLite / PostgreSQL<br/>SQLAlchemy async)]
-        FS[Local uploads<br/>or base64 in DB]
+        DB[("SQLite / PostgreSQL")]
+        FS["Local uploads or base64"]
     end
 
-    UI --> AC --> API
-    API -->|JWT Bearer| AUTH
-    API --> SCAN
-    API --> CHAT
-    API --> DASH
+    UI --> AC --> APIJS
+    APIJS -->|"JWT Bearer"| AUTH
+    APIJS --> SCAN
+    APIJS --> CHAT
+    APIJS --> DASH
 
     SCAN --> AIM
     SCAN --> GEM
@@ -138,14 +138,13 @@ sequenceDiagram
     participant DB as Database
 
     User->>FE: Upload leaf image
-    FE->>API: POST /api/scan/upload (multipart)
-    API->>ML: predict_sync(image) via run_in_executor
-    ML-->>API: { disease, confidence }
-    API->>Gemini: ask_gemini(explanation_prompt)
-    API->>API: base64 encode image
-    Note over API: Gemini + base64 run in parallel (asyncio.gather)
+    FE->>API: POST /api/scan/upload
+    API->>ML: predict_sync via run_in_executor
+    ML-->>API: disease + confidence
+    Note over API,Gemini: Gemini call and base64 encoding run in parallel
+    API->>Gemini: ask_gemini explanation prompt
     Gemini-->>API: AI explanation text
-    API->>DB: INSERT Scan (if user logged in)
+    API->>DB: INSERT Scan if user is logged in
     DB-->>API: scan_id
     API-->>FE: diagnosis + explanation + treatments + image_url
     FE->>User: Show ScanResultsPage
@@ -172,16 +171,16 @@ erDiagram
         string disease
         float confidence
         string severity
-        text recommendation
-        text image_url
+        string recommendation
+        string image_url
         datetime created_at
     }
 
     CHAT {
         int id PK
         int user_id FK
-        text query
-        text response
+        string query
+        string response
         datetime timestamp
     }
 
