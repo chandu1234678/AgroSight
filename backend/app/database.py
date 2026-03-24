@@ -64,17 +64,37 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db():
     """
-    Initialize database tables (create all tables from models).
-    Call this once at startup.
+    Initialize database tables and apply any pending column additions.
+    Uses create_all for new tables, then runs idempotent ALTER TABLE
+    statements for columns added after initial creation.
     """
-    # Import models here to register them with Base.metadata
-    # This ensures all model definitions are loaded before creating tables
     from app.db.base import Base
     from app.models import User, Prediction, Disease  # noqa: F401
-    
+    from app.models.scan import Scan  # noqa: F401
+    from app.models.chat import ChatHistory  # noqa: F401
+
     async with engine.begin() as conn:
-        # This creates all tables defined in models
         await conn.run_sync(Base.metadata.create_all)
+
+    # ── Idempotent column migrations ──────────────────────────────────────
+    # SQLite does not support IF NOT EXISTS on ALTER TABLE, so we check
+    # existing columns first and only add what's missing.
+    async with engine.begin() as conn:
+        # Get current columns in scans table
+        result = await conn.execute(
+            __import__('sqlalchemy').text("PRAGMA table_info(scans)")
+        )
+        existing = {row[1] for row in result.fetchall()}
+
+        migrations = [
+            ("gradcam_url",       "ALTER TABLE scans ADD COLUMN gradcam_url TEXT"),
+            ("affected_area_pct", "ALTER TABLE scans ADD COLUMN affected_area_pct REAL"),
+            ("spread_risk_pct",   "ALTER TABLE scans ADD COLUMN spread_risk_pct REAL"),
+        ]
+        for col, sql in migrations:
+            if col not in existing:
+                await conn.execute(__import__('sqlalchemy').text(sql))
+                print(f"✓ Migration applied: added scans.{col}")
 
 
 async def close_db():

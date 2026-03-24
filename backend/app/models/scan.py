@@ -22,4 +22,4 @@ class Scan(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", foreign_keys=[user_id])
+    user = relationship("User", foreign_keys=[user_id], overlaps="scans")
