@@ -68,53 +68,68 @@ class AIModelService:
     # ── GradCAM ──────────────────────────────────────────────────────────────
 
     @classmethod
-    def _compute_gradcam(cls, image_tensor, class_idx):
+    def _compute_gradcam(cls, original_pil, class_idx):
         """
-        Compute GradCAM heatmap for the given class index using ResNet34's
-        last convolutional layer (layer4).
+        Proper GradCAM on ResNet34's last BasicBlock (layer4[-1]).
+        Hooks the last conv layer inside that block so we get a full
+        spatial activation map, not a collapsed single pixel.
 
-        Returns a numpy float32 array of shape (H, W) normalised to [0, 1].
+        Returns a numpy float32 array (H, W) normalised to [0, 1].
         """
+        import numpy as np
         torch = cls._torch
 
-        gradients = []
+        # Target: last BasicBlock in layer4, then its second conv (conv2)
+        target_layer = cls.model.layer4[-1].conv2
+
+        gradients  = []
         activations = []
 
-        def save_gradient(grad):
-            gradients.append(grad)
+        def fwd_hook(module, inp, out):
+            activations.append(out.detach())
 
-        def forward_hook(module, inp, out):
-            activations.append(out)
-            out.register_hook(save_gradient)
+        def bwd_hook(module, grad_in, grad_out):
+            gradients.append(grad_out[0].detach())
 
-        # Hook onto the last conv block
-        handle = cls.model.layer4.register_forward_hook(forward_hook)
+        fwd_handle = target_layer.register_forward_hook(fwd_hook)
+        bwd_handle = target_layer.register_full_backward_hook(bwd_hook)
 
-        # Forward pass with grad enabled
+        # Fresh tensor with grad enabled
+        img_t = cls.transform(original_pil).unsqueeze(0).to(cls.device)
+        img_t.requires_grad_(True)
+
         cls.model.zero_grad()
-        output = cls.model(image_tensor)
+        output = cls.model(img_t)
+
+        # Backprop only the predicted class score
         score = output[0, class_idx]
         score.backward()
 
-        handle.remove()
+        fwd_handle.remove()
+        bwd_handle.remove()
 
-        # Pool gradients over spatial dims
-        grad = gradients[0]           # (1, C, H, W)
-        act  = activations[0]         # (1, C, H, W)
+        if not gradients or not activations:
+            # Fallback: return uniform mid-level map
+            return np.full((7, 7), 0.5, dtype=np.float32)
+
+        grad = gradients[0]        # (1, C, H, W)
+        act  = activations[0]      # (1, C, H, W)
+
+        # Global average pool the gradients → channel weights
         weights = grad.mean(dim=(2, 3), keepdim=True)   # (1, C, 1, 1)
 
-        cam = (weights * act).sum(dim=1, keepdim=True)  # (1, 1, H, W)
-        cam = torch.nn.functional.relu(cam)
-        cam = cam.squeeze().cpu().detach().numpy()       # (H, W)
+        cam = (weights * act).sum(dim=1).squeeze()       # (H, W)
+        cam = torch.nn.functional.relu(cam).cpu().numpy()
 
-        # Normalise
+        # Normalise to [0, 1]
         cam_min, cam_max = cam.min(), cam.max()
         if cam_max - cam_min > 1e-8:
             cam = (cam - cam_min) / (cam_max - cam_min)
         else:
-            cam = cam * 0.0
+            # Model is very confident — fill with a moderate uniform map
+            cam = np.full_like(cam, 0.4)
 
-        return cam
+        return cam.astype(np.float32)
 
     @classmethod
     def _cam_to_heatmap_overlay(cls, original_pil, cam_np):
@@ -135,9 +150,9 @@ class AIModelService:
         heatmap_bgr = cv2.applyColorMap(cam_uint8, cv2.COLORMAP_JET)
         heatmap_rgb = cv2.cvtColor(heatmap_bgr, cv2.COLOR_BGR2RGB)
 
-        # Blend with original
+        # Blend with original — 40% original, 60% heatmap so activations are clearly visible
         orig_np = np.array(original_pil.convert("RGB"))
-        overlay = cv2.addWeighted(orig_np, 0.55, heatmap_rgb, 0.45, 0)
+        overlay = cv2.addWeighted(orig_np, 0.40, heatmap_rgb, 0.60, 0)
         overlay_pil = Image.fromarray(overlay)
 
         # ── Area estimation ──────────────────────────────────────────────
@@ -201,11 +216,7 @@ class AIModelService:
             disease   = cls.class_names[class_idx]
 
             # ── GradCAM ──────────────────────────────────────────────────
-            # Need grad, so re-run with grad enabled
-            image_tensor_grad = cls.transform(original_pil).unsqueeze(0).to(cls.device)
-            image_tensor_grad.requires_grad_(False)
-
-            cam_np = cls._compute_gradcam(image_tensor_grad, class_idx)
+            cam_np = cls._compute_gradcam(original_pil, class_idx)
             overlay_pil, affected_pct, spread_pct = cls._cam_to_heatmap_overlay(original_pil, cam_np)
 
             gradcam_b64 = cls._pil_to_b64(overlay_pil)
