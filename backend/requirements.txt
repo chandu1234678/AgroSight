@@ -35,3 +35,7 @@ cloudinary==1.38.0
 python-dotenv==1.0.0
 pydantic==2.5.3
 pydantic-settings==2.1.0
+
+# Report generation
+openpyxl==3.1.2
+reportlab==4.1.0

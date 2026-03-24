@@ -48,6 +48,11 @@ const ScanResultsPage = () => {
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
 
+  // Scroll to top when result loads
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   // Persist to sessionStorage whenever result changes
   useEffect(() => {
     if (!result) return;

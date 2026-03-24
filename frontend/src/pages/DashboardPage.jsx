@@ -9,6 +9,8 @@ const DashboardPage = () => {
   const [stats, setStats] = useState(null);
   const [recentScans, setRecentScans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [userName, setUserName] = useState('User');
 
   useEffect(() => {
@@ -20,7 +22,6 @@ const DashboardPage = () => {
         ]);
         setStats(statsRes.data);
         setRecentScans(scansRes.data.slice(0, 3));
-        
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         setUserName(user.name?.split(' ')[0] || 'User');
       } catch (error) {
@@ -31,6 +32,29 @@ const DashboardPage = () => {
     };
     fetchData();
   }, []);
+
+  const handleDownloadReport = async (format) => {
+    setDownloading(format);
+    setShowDownloadModal(false);
+    try {
+      const res = await dashboardAPI.downloadReport(format);
+      const ext = { csv: 'csv', excel: 'xlsx', pdf: 'pdf' }[format];
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = res.headers['content-disposition'];
+      const match = disposition?.match(/filename=(.+)/);
+      a.download = match ? match[1] : `agrosight_report.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -55,8 +79,9 @@ const DashboardPage = () => {
               Welcome, {userName}.
             </h1>
             <p className="text-on-surface-variant font-body text-lg max-w-2xl leading-relaxed">
-              Your crops are showing optimal resilience. AI analysis suggests a{' '}
-              <span className="text-primary font-bold">2.4% increase</span> in yield potential since last scan.
+              {stats?.total_scans > 0
+                ? `You have ${stats.total_scans} scan${stats.total_scans !== 1 ? 's' : ''} recorded. ${stats.healthy_pct}% of your crops are healthy.`
+                : 'No scans yet. Start by scanning your first plant below.'}
             </p>
           </section>
 
@@ -66,10 +91,10 @@ const DashboardPage = () => {
                 <span className="material-symbols-outlined text-6xl">analytics</span>
               </div>
               <p className="text-secondary-fixed-dim text-xs font-bold uppercase tracking-widest mb-4">Total Scans</p>
-              <h3 className="text-4xl font-headline font-black text-on-surface">{stats?.total_scans || 245}</h3>
+              <h3 className="text-4xl font-headline font-black text-on-surface">{stats?.total_scans ?? 0}</h3>
               <div className="mt-4 flex items-center gap-2 text-primary text-xs">
-                <span className="material-symbols-outlined text-sm">trending_up</span>
-                <span>12% from last month</span>
+                <span className="material-symbols-outlined text-sm">bar_chart</span>
+                <span>{stats?.total_scans === 1 ? '1 scan recorded' : `${stats?.total_scans ?? 0} scans recorded`}</span>
               </div>
             </div>
 
@@ -78,10 +103,10 @@ const DashboardPage = () => {
                 <span className="material-symbols-outlined text-6xl">coronavirus</span>
               </div>
               <p className="text-secondary-fixed-dim text-xs font-bold uppercase tracking-widest mb-4">Diseases Detected</p>
-              <h3 className="text-4xl font-headline font-black text-error">{stats?.diseases_detected || 12}</h3>
+              <h3 className="text-4xl font-headline font-black text-error">{stats?.diseases_detected ?? 0}</h3>
               <div className="mt-4 flex items-center gap-2 text-on-surface-variant text-xs">
                 <span className="material-symbols-outlined text-sm">history</span>
-                <span>Stability maintained</span>
+                <span>{stats?.diseases_detected === 0 ? 'No issues found' : 'Requires attention'}</span>
               </div>
             </div>
 
@@ -90,10 +115,10 @@ const DashboardPage = () => {
                 <span className="material-symbols-outlined text-6xl">spa</span>
               </div>
               <p className="text-secondary-fixed-dim text-xs font-bold uppercase tracking-widest mb-4">Healthy Plants</p>
-              <h3 className="text-4xl font-headline font-black text-on-surface">{stats?.healthy_plants || 218}</h3>
+              <h3 className="text-4xl font-headline font-black text-on-surface">{stats?.healthy_scans ?? 0}</h3>
               <div className="mt-4 flex items-center gap-2 text-primary text-xs">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                <span>89% of total crop</span>
+                <span>{stats?.healthy_pct ?? 0}% of total scans</span>
               </div>
             </div>
 
@@ -103,11 +128,11 @@ const DashboardPage = () => {
               </div>
               <p className="text-secondary-fixed-dim text-xs font-bold uppercase tracking-widest mb-4">Accuracy</p>
               <h3 className="text-4xl font-headline font-black text-on-surface">
-                {stats?.accuracy || '98.4'}<span className="text-xl">%</span>
+                {stats?.accuracy ?? 0}<span className="text-xl">%</span>
               </h3>
               <div className="mt-4 flex items-center gap-2 text-primary text-xs">
                 <span className="material-symbols-outlined text-sm">bolt</span>
-                <span>High Confidence</span>
+                <span>{(stats?.accuracy ?? 0) >= 90 ? 'High Confidence' : 'Avg Confidence'}</span>
               </div>
             </div>
           </section>
@@ -161,10 +186,19 @@ const DashboardPage = () => {
                 <h2 className="text-2xl font-headline font-bold text-on-surface">Recent Scans</h2>
                 <p className="text-on-surface-variant text-sm mt-1">Real-time telemetry from your primary fields.</p>
               </div>
-              <Link to="/history" className="text-primary text-sm font-semibold flex items-center gap-1 hover:underline">
-                View All Scans
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </Link>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowDownloadModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface-variant text-sm font-semibold transition-all"
+                >
+                  <span className="material-symbols-outlined text-base">download</span>
+                  Export Report
+                </button>
+                <Link to="/history" className="text-primary text-sm font-semibold flex items-center gap-1 hover:underline">
+                  View All
+                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                </Link>
+              </div>
             </div>
 
             <div className="bg-surface-container-low rounded-xl overflow-hidden">
@@ -253,6 +287,53 @@ const DashboardPage = () => {
         </div>
       </main>
       <BottomNavBar />
+
+      {/* ── Download Format Modal ─────────────────────────────────────── */}
+      {showDownloadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-surface-container-low rounded-2xl w-full max-w-sm shadow-2xl border border-outline-variant/20 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/10">
+              <div>
+                <h3 className="font-bold text-on-surface font-headline">Download Report</h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">Choose your preferred format</p>
+              </div>
+              <button onClick={() => setShowDownloadModal(false)}
+                className="p-1.5 rounded-full hover:bg-surface-container-highest text-on-surface-variant transition-colors">
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {[
+                { fmt: 'pdf',   icon: 'picture_as_pdf', label: 'PDF Report',      desc: 'Styled report with charts & summary',  color: 'text-red-400',   bg: 'hover:bg-red-500/10   border-red-500/20'   },
+                { fmt: 'excel', icon: 'table_chart',    label: 'Excel Spreadsheet', desc: 'Full data with formatting & stats',   color: 'text-green-400', bg: 'hover:bg-green-500/10 border-green-500/20' },
+                { fmt: 'csv',   icon: 'csv',            label: 'CSV File',         desc: 'Raw data for custom analysis',         color: 'text-blue-400',  bg: 'hover:bg-blue-500/10  border-blue-500/20'  },
+              ].map(({ fmt, icon, label, desc, color, bg }) => (
+                <button
+                  key={fmt}
+                  onClick={() => handleDownloadReport(fmt)}
+                  disabled={!!downloading}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl border bg-surface-container-highest/50 ${bg} transition-all disabled:opacity-50 text-left`}
+                >
+                  <div className={`w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center shrink-0 ${color}`}>
+                    {downloading === fmt
+                      ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      : <span className="material-symbols-outlined text-xl">{icon}</span>
+                    }
+                  </div>
+                  <div>
+                    <p className="font-semibold text-on-surface text-sm">{label}</p>
+                    <p className="text-xs text-on-surface-variant">{desc}</p>
+                  </div>
+                  {!downloading && (
+                    <span className="material-symbols-outlined text-on-surface-variant text-base ml-auto">download</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

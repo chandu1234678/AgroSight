@@ -42,6 +42,8 @@ export const authAPI = {
 
 export const dashboardAPI = {
   getStats: () => api.get('/api/dashboard/stats'),
+  downloadReport: (format = 'csv') =>
+    api.get('/api/dashboard/report/download', { params: { format }, responseType: 'blob' }),
 };
 
 export const scanAPI = {

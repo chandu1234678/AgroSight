@@ -36,26 +36,27 @@ class ChatService:
     
     @staticmethod
     async def ask_gemini(query: str) -> str:
-        """Get detailed response from Google Gemini API."""
-        # Initialize Gemini if needed
-        if ChatService._init_gemini():
-            try:
-                # Create a farming/agriculture focused prompt
-                system_prompt = """You are an expert agricultural AI assistant specializing in plant diseases, 
-crop management, and farming practices. Provide accurate, practical advice for farmers. 
-Keep responses concise but informative. Focus on actionable solutions."""
-                
-                full_prompt = f"{system_prompt}\n\nUser question: {query}"
-                
-                response = ChatService._gemini_model.generate_content(full_prompt)
-                return response.text
-            except Exception as e:
-                print(f"Gemini API error: {e}")
-                # Fall back to mock response
-                return ChatService._get_mock_response(query)
-        else:
-            # Use mock response if Gemini not available
+        """Get response from Google Gemini API — runs in thread pool to avoid blocking."""
+        import asyncio
+
+        def _call():
+            if ChatService._init_gemini():
+                try:
+                    system_prompt = (
+                        "You are an expert agricultural AI assistant specializing in plant diseases, "
+                        "crop management, and farming practices. Provide accurate, practical advice for farmers. "
+                        "Keep responses concise but informative. Focus on actionable solutions."
+                    )
+                    full_prompt = f"{system_prompt}\n\nUser question: {query}"
+                    response = ChatService._gemini_model.generate_content(full_prompt)
+                    return response.text
+                except Exception as e:
+                    print(f"Gemini API error: {e}")
+                    return ChatService._get_mock_response(query)
             return ChatService._get_mock_response(query)
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _call)
     
     @staticmethod
     async def ask_cerebras(query: str) -> str:

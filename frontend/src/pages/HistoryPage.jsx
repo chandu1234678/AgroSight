@@ -229,9 +229,29 @@ const HistoryPage = () => {
                       <span> We've detected recurring patterns that may require attention. Recommended action: Review affected crops and consider preventive measures.</span>
                     )}
                   </p>
-                  <button className="mt-6 text-primary text-sm font-bold flex items-center gap-2 hover:underline">
-                    View Detailed Intelligence Report
-                    <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                  <button
+                    onClick={async () => {
+                      const fmt = window.prompt('Download format? Type: pdf, excel, or csv', 'pdf');
+                      if (!fmt || !['pdf','excel','csv'].includes(fmt)) return;
+                      try {
+                        const { dashboardAPI } = await import('../services/api');
+                        const res = await dashboardAPI.downloadReport(fmt);
+                        const ext = { csv: 'csv', excel: 'xlsx', pdf: 'pdf' }[fmt];
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const disposition = res.headers['content-disposition'];
+                        const match = disposition?.match(/filename=(.+)/);
+                        a.download = match ? match[1] : `agrosight_report.${ext}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                      } catch { /* ignore */ }
+                    }}
+                    className="mt-6 text-primary text-sm font-bold flex items-center gap-2 hover:underline">
+                    Download Intelligence Report
+                    <span className="material-symbols-outlined text-xs">download</span>
                   </button>
                 </div>
               </div>

@@ -13,7 +13,10 @@ const ChatPage = () => {
   const [inputMessage, setInputMessage] = useState(location.state?.prefill || '');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const latestAiRef = useRef(null);
   const textareaRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const isNewMessage = useRef(false);
 
   // Load chat history on mount
   useEffect(() => {
@@ -54,7 +57,12 @@ const ChatPage = () => {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!isNewMessage.current) return;
+    // Scroll to top of the latest AI response
+    if (latestAiRef.current) {
+      latestAiRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    isNewMessage.current = false;
   }, [messages]);
 
   const handleInput = (e) => {
@@ -88,6 +96,7 @@ const ChatPage = () => {
 
     try {
       const response = await chatAPI.ask(query);
+      isNewMessage.current = true;
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         type: 'ai',
@@ -95,6 +104,7 @@ const ChatPage = () => {
         timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       }]);
     } catch {
+      isNewMessage.current = true;
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         type: 'ai',
@@ -118,7 +128,10 @@ const ChatPage = () => {
     } catch { /* ignore */ }
   };
 
-  const renderMessage = (message) => {
+  const renderMessage = (message, index) => {
+    const isLastAi = message.type === 'ai' &&
+      messages.slice(index + 1).every(m => m.type !== 'ai');
+
     if (message.type === 'date') {
       return (
         <div key={message.id} className="flex justify-center">
@@ -146,7 +159,7 @@ const ChatPage = () => {
 
     if (message.type === 'ai') {
       return (
-        <div key={message.id} className="flex justify-start">
+        <div key={message.id} ref={isLastAi ? latestAiRef : null} className="flex justify-start">
           <div className="flex items-start gap-3 max-w-[90%] md:max-w-[80%]">
             <div className="w-9 h-9 rounded-full bg-surface-container-highest flex-shrink-0 flex items-center justify-center border border-primary/20 mt-1">
               <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
@@ -211,7 +224,7 @@ const ChatPage = () => {
                 </div>
               </div>
             ) : (
-              messages.map(renderMessage)
+              messages.map((msg, i) => renderMessage(msg, i))
             )}
 
             {loading && (

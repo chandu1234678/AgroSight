@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
+import asyncio
 import base64
 import io
 from datetime import datetime
@@ -25,19 +26,21 @@ async def upload_scan(
         raise HTTPException(status_code=400, detail="File must be an image")
 
     file_bytes = await file.read()
-
-    # Base64 data URL for immediate display
-    b64 = base64.b64encode(file_bytes).decode("utf-8")
     mime = file.content_type or "image/jpeg"
-    image_url = f"data:{mime};base64,{b64}"
 
-    # Run AI model
-    fake_file = io.BytesIO(file_bytes)
-    prediction = await AIModelService.predict(fake_file)
-
-    raw_confidence = min(prediction["confidence"], 0.99)
-
+    # ── Run model inference + Gemini explanation in PARALLEL ──────────────
     from app.services.disease_info import DiseaseInfoService
+    from app.services.chat_service import ChatService
+
+    # Start model inference immediately (runs in thread pool to avoid blocking)
+    loop = asyncio.get_event_loop()
+    prediction_task = loop.run_in_executor(
+        None, AIModelService.predict_sync, io.BytesIO(file_bytes)
+    )
+
+    # Await prediction first (needed to build Gemini prompt)
+    prediction = await prediction_task
+    raw_confidence = min(prediction["confidence"], 0.99)
     disease_info = DiseaseInfoService.get_disease_info(prediction["disease"])
 
     if raw_confidence > 0.85:
@@ -47,23 +50,33 @@ async def upload_scan(
     else:
         severity = "low"
 
-    # AI explanation via Gemini
-    from app.services.chat_service import ChatService
     disease_display = prediction["disease"].replace("_", " ").title()
     explanation_prompt = (
         f"In 2-3 sentences, explain what {disease_display} is, what causes it, "
         f"and why it's dangerous to crops. Be concise and practical for a farmer."
     )
-    try:
-        ai_explanation = await ChatService.ask_gemini(explanation_prompt)
-    except Exception:
+
+    # ── Run Gemini + base64 encoding in parallel ──────────────────────────
+    async def encode_image():
+        return base64.b64encode(file_bytes).decode("utf-8")
+
+    gemini_task = asyncio.create_task(ChatService.ask_gemini(explanation_prompt))
+    b64_task    = asyncio.create_task(encode_image())
+
+    ai_explanation, b64 = await asyncio.gather(
+        gemini_task, b64_task, return_exceptions=True
+    )
+
+    if isinstance(ai_explanation, Exception):
         ai_explanation = disease_info.get("cause", "Disease information not available.")
 
+    image_url = f"data:{mime};base64,{b64}"
+
+    # ── Persist to DB ─────────────────────────────────────────────────────
     scan_id = None
     saved = False
     created_at = datetime.utcnow()
 
-    # Save to DB if user is authenticated
     if current_user:
         scan = Scan(
             user_id=current_user.id,
@@ -109,7 +122,6 @@ async def get_scan_history(
     skip: int = 0,
     limit: int = 50,
 ):
-    """Get user's scan history."""
     result = await db.execute(
         select(Scan)
         .where(Scan.user_id == current_user.id)
@@ -137,7 +149,6 @@ async def get_scan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get specific scan details."""
     result = await db.execute(
         select(Scan).where(Scan.id == scan_id, Scan.user_id == current_user.id)
     )
@@ -162,7 +173,6 @@ async def delete_scan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a scan."""
     result = await db.execute(
         select(Scan).where(Scan.id == scan_id, Scan.user_id == current_user.id)
     )
