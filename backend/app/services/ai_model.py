@@ -21,6 +21,18 @@ def _norm01(arr):
     return (arr * 0).astype(np.float32)
 
 
+def _sharpen_cam(cam, percentile=70):
+    """
+    Suppress low-activation background so only the top regions stay hot.
+    Pixels below the percentile threshold are pushed toward zero.
+    This prevents the whole-leaf-is-red problem.
+    """
+    import numpy as np
+    threshold = float(np.percentile(cam, percentile))
+    sharpened = np.where(cam >= threshold, cam, cam * 0.1)
+    return _norm01(sharpened)
+
+
 def _gaussian_fallback(h, w):
     import numpy as np
     y, x = np.ogrid[:h, :w]
@@ -39,24 +51,33 @@ def _pil_to_b64(pil_img, fmt="JPEG", quality=88):
 
 
 def _overlay_jet(original_pil, cam_np):
-    """Blend jet-colormap heatmap over original. Returns PIL image."""
+    """
+    Blend jet-colormap heatmap over original.
+    Sharpens the cam first so only high-activation spots stay red.
+    Returns (PIL image, resized cam at original resolution).
+    """
     import numpy as np
     from PIL import Image
     import cv2
     ow, oh = original_pil.size
     cam_r = cv2.resize(cam_np, (ow, oh), interpolation=cv2.INTER_LINEAR)
-    heat  = cv2.applyColorMap((cam_r * 255).astype(np.uint8), cv2.COLORMAP_JET)
+    # Sharpen: suppress background, keep only top activations
+    cam_sharp = _sharpen_cam(cam_r, percentile=75)
+    heat  = cv2.applyColorMap((cam_sharp * 255).astype(np.uint8), cv2.COLORMAP_JET)
     heat  = cv2.cvtColor(heat, cv2.COLOR_BGR2RGB)
     orig  = np.array(original_pil.convert("RGB"))
-    blend = cv2.addWeighted(orig, 0.45, heat, 0.55, 0)
+    # Blend more original where activation is low, more heatmap where it's high
+    alpha = cam_sharp[:, :, np.newaxis]  # per-pixel blend
+    blend = (orig * (1 - alpha * 0.7) + heat * alpha * 0.7).astype(np.uint8)
     return Image.fromarray(blend), cam_r
 
 
 def _overlay_ig(original_pil, ig_np):
     """
-    Visualise Integrated Gradients as a two-colour overlay:
-      green  = positive attribution  (pushes toward disease)
-      red    = negative attribution  (pushes toward healthy / away from disease)
+    Visualise Integrated Gradients with strong visible contrast:
+      bright green  = positive attribution (disease markers)
+      bright red    = negative attribution (healthy tissue pushed away)
+    Uses a semi-transparent solid colour mask so it's clearly visible.
     """
     import numpy as np
     from PIL import Image
@@ -66,16 +87,26 @@ def _overlay_ig(original_pil, ig_np):
 
     orig = np.array(original_pil.convert("RGB")).astype(np.float32)
 
-    pos = np.clip( ig_r, 0, 1)   # positive: disease markers
-    neg = np.clip(-ig_r, 0, 1)   # negative: healthy tissue
+    # Separate positive and negative, normalise each independently
+    pos = np.clip(ig_r, 0, None)
+    neg = np.clip(-ig_r, 0, None)
+    pos_max = pos.max()
+    neg_max = neg.max()
+    if pos_max > 1e-7: pos = pos / pos_max
+    if neg_max > 1e-7: neg = neg / neg_max
 
-    overlay = orig.copy()
-    # Green channel boost for positive, red channel boost for negative
-    overlay[:, :, 1] = np.clip(orig[:, :, 1] + pos * 180, 0, 255)
-    overlay[:, :, 0] = np.clip(orig[:, :, 0] + neg * 180, 0, 255)
-    overlay[:, :, 2] = np.clip(orig[:, :, 2] * (1 - 0.4 * (pos + neg)), 0, 255)
+    # Build RGBA overlay: green for disease, red for healthy
+    overlay = np.zeros((oh, ow, 4), dtype=np.float32)
+    overlay[:, :, 1] = pos * 255          # green channel
+    overlay[:, :, 0] = neg * 255          # red channel
+    overlay[:, :, 3] = (pos + neg) * 200  # alpha — stronger where attribution is strong
 
-    return Image.fromarray(overlay.astype(np.uint8)), ig_r
+    # Composite over original
+    a = overlay[:, :, 3:4] / 255.0
+    result = orig * (1 - a * 0.65) + overlay[:, :, :3] * a * 0.65
+    result = np.clip(result, 0, 255).astype(np.uint8)
+
+    return Image.fromarray(result), ig_r
 
 
 class AIModelService:
@@ -297,11 +328,14 @@ class AIModelService:
             ig_pil, _ = _overlay_ig(original_pil, ig_np)
             ig_b64 = _pil_to_b64(ig_pil)
 
-            # Top-5 class probabilities for the IG bar chart
+            # Top-5 class probabilities
             probs_np = probs.squeeze().cpu().numpy()
             top5_idx = probs_np.argsort()[::-1][:5]
             top5 = [
-                {"label": cls.class_names[i].replace("_", " ").title(), "prob": round(float(probs_np[i]) * 100, 1)}
+                {
+                    "label": cls.class_names[i].replace("_", " ").title(),
+                    "prob": round(float(probs_np[i]) * 100, 2)   # 2 decimals so 0.03% shows
+                }
                 for i in top5_idx
             ]
             print(f"✓ Integrated Gradients computed")

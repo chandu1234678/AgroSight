@@ -322,7 +322,11 @@ const ScanResultsPage = () => {
                             <span className={`font-medium truncate max-w-[70%] ${i === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{p.label}</span>
                             <span className={i === 0 ? 'text-primary font-bold' : 'text-on-surface-variant'}>{p.prob}%</span>
                           </div>
-                          <AnimatedBar pct={p.prob} colorClass={i === 0 ? 'bg-primary' : 'bg-surface-container-highest'} height="h-1.5" />
+                          <AnimatedBar
+                            pct={i === 0 ? p.prob : Math.max(p.prob, 0.5)}
+                            colorClass={i === 0 ? 'bg-primary' : 'bg-primary/30'}
+                            height="h-1.5"
+                          />
                         </div>
                       ))}
                     </div>
