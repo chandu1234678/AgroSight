@@ -15,12 +15,12 @@ from sqlalchemy import (
     Boolean,
     Index,
 )
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 
-# SQLAlchemy declarative base for all models
-Base = declarative_base()
+# Import shared Base to ensure Alembic can detect all models
+from app.db.base import Base
 
 
 class Language(str, enum.Enum):
