@@ -1,6 +1,6 @@
-# 🌾 AgroSight - AI-Powered Plant Disease Detection
+# AgroSight - AI-Powered Plant Disease Detection
 
-> A smart web application that helps farmers identify plant diseases by simply uploading a photo! Built with AI/ML for accurate detection and helpful recommendations.
+> A full-stack web application that uses deep learning to identify plant diseases from images, providing farmers with instant diagnosis and treatment recommendations.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green.svg)](https://fastapi.tiangolo.com/)
@@ -9,41 +9,45 @@
 
 ---
 
-## 🎯 What is AgroSight?
+## Overview
 
-AgroSight is a **full-stack web application** that uses **Artificial Intelligence** to detect plant diseases from images. Farmers can:
-- 📸 Upload a photo of their plant
-- 🤖 Get instant AI-powered disease detection
-- 💡 Receive treatment recommendations
-- 💬 Chat with an AI assistant for farming advice
-- 📊 Track their scan history on a dashboard
+AgroSight is a production-ready web application that leverages artificial intelligence and computer vision to detect plant diseases. The system allows users to upload plant images and receive real-time disease predictions with confidence scores and treatment recommendations.
+
+### Key Features
+
+- Image-based plant disease detection using ResNet CNN
+- User authentication and authorization with JWT
+- Real-time AI chat assistant for agricultural advice
+- Historical scan tracking and analytics dashboard
+- RESTful API with comprehensive documentation
+- Responsive web interface built with React
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```mermaid
 graph TB
-    subgraph "Frontend - React"
-        A[User Interface] --> B[Login/Signup]
-        A --> C[Upload Image]
+    subgraph "Frontend Layer"
+        A[User Interface] --> B[Authentication]
+        A --> C[Image Upload]
         A --> D[Dashboard]
-        A --> E[Chat Assistant]
+        A --> E[Chat Interface]
     end
     
-    subgraph "Backend - FastAPI"
-        F[API Server] --> G[Authentication JWT]
+    subgraph "Backend Layer"
+        F[FastAPI Server] --> G[JWT Auth Service]
         F --> H[Image Processing]
-        F --> I[Database SQLite]
+        F --> I[SQLite Database]
         F --> J[AI Model Service]
     end
     
-    subgraph "ML Pipeline - PyTorch"
-        K[ResNet Model] --> L[Disease Detection]
-        M[Training Data] --> K
+    subgraph "ML Layer"
+        K[ResNet Model] --> L[Disease Classification]
+        M[Training Pipeline] --> K
     end
     
-    subgraph "External APIs"
+    subgraph "External Services"
         N[Google Gemini API]
         O[Cerebras API]
     end
@@ -63,7 +67,7 @@ graph TB
 
 ---
 
-## 🔄 How It Works - User Flow
+## Application Flow
 
 ```mermaid
 sequenceDiagram
@@ -73,175 +77,210 @@ sequenceDiagram
     participant AI Model
     participant Database
     
-    User->>Frontend: 1. Upload plant image
-    Frontend->>Backend: 2. Send image via API
-    Backend->>AI Model: 3. Process image
-    AI Model->>AI Model: 4. Run ResNet inference
-    AI Model->>Backend: 5. Return disease prediction
-    Backend->>Database: 6. Save scan result
-    Backend->>Frontend: 7. Send result (disease, confidence)
-    Frontend->>User: 8. Display diagnosis & recommendations
+    User->>Frontend: Upload plant image
+    Frontend->>Backend: POST /api/scan
+    Backend->>AI Model: Process image
+    AI Model->>AI Model: Run inference
+    AI Model->>Backend: Return prediction
+    Backend->>Database: Store scan result
+    Backend->>Frontend: Return diagnosis
+    Frontend->>User: Display results
 ```
 
 ---
 
-## �️ Tech Stack Explained
+## Technology Stack
 
-### Frontend (What Users See)
-- **React** - Modern JavaScript library for building user interfaces
-- **Vite** - Super fast build tool for development
-- **Axios** - Makes API calls to backend
-- **Tailwind CSS** - Beautiful, responsive styling
+### Frontend
+- **React 18.2** - Component-based UI library
+- **Vite** - Build tool and development server
+- **Axios** - HTTP client for API communication
+- **React Router** - Client-side routing
+- **Context API** - State management
 
-### Backend (The Brain)
-- **FastAPI** - Python web framework (super fast & easy to use)
-- **SQLAlchemy** - Talks to the database
-- **Alembic** - Manages database changes
-- **JWT** - Secure user authentication (like a digital ID card)
+### Backend
+- **FastAPI** - Modern Python web framework
+- **SQLAlchemy** - SQL toolkit and ORM
+- **Alembic** - Database migration tool
+- **Pydantic** - Data validation using Python type hints
+- **Passlib & JWT** - Authentication and security
 
-### AI/ML (The Intelligence)
+### Machine Learning
 - **PyTorch** - Deep learning framework
-- **ResNet** - Pre-trained neural network (transfer learning)
-- **Torchvision** - Image processing tools
+- **Torchvision** - Computer vision library
+- **ResNet** - Convolutional neural network architecture
+- **PIL/Pillow** - Image processing
 
 ### Database
-- **SQLite** - Simple database for development
-- **PostgreSQL** - Powerful database for production
+- **SQLite** - Development database
+- **PostgreSQL** - Production database (Docker)
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 agrosight/
 │
-├── backend/                    # Python backend server
+├── backend/
 │   ├── app/
-│   │   ├── api/               # API endpoints (routes)
+│   │   ├── api/
+│   │   │   ├── deps.py
 │   │   │   └── routes/
-│   │   │       ├── auth.py    # Login/Signup
-│   │   │       ├── scan.py    # Image upload & detection
-│   │   │       ├── chat.py    # AI chat assistant
-│   │   │       └── dashboard.py
-│   │   ├── core/              # Configuration & security
-│   │   ├── models/            # Database models (User, Scan, Chat)
-│   │   ├── schemas/           # Data validation
-│   │   ├── services/          # Business logic
-│   │   │   ├── ai_model.py    # AI inference
-│   │   │   ├── chat_service.py
-│   │   │   └── storage_service.py
-│   │   └── db/                # Database setup
+│   │   │       ├── auth.py          # Authentication endpoints
+│   │   │       ├── scan.py          # Disease detection endpoints
+│   │   │       ├── chat.py          # Chat assistant endpoints
+│   │   │       └── dashboard.py     # Analytics endpoints
+│   │   ├── core/
+│   │   │   ├── config.py            # Application configuration
+│   │   │   └── security.py          # Security utilities
+│   │   ├── models/
+│   │   │   ├── user.py              # User database model
+│   │   │   ├── scan.py              # Scan database model
+│   │   │   └── chat.py              # Chat database model
+│   │   ├── schemas/
+│   │   │   ├── user.py              # User Pydantic schemas
+│   │   │   ├── scan.py              # Scan Pydantic schemas
+│   │   │   └── chat.py              # Chat Pydantic schemas
+│   │   ├── services/
+│   │   │   ├── ai_model.py          # ML inference service
+│   │   │   ├── chat_service.py      # Chat integration service
+│   │   │   └── storage_service.py   # File storage service
+│   │   └── db/
+│   │       ├── base.py              # Database base configuration
+│   │       ├── session.py           # Database session management
+│   │       └── migrations/          # Alembic migrations
 │   │
-│   ├── ml/                    # Machine Learning pipeline
-│   │   ├── models/            # ResNet architecture
-│   │   ├── training/          # Train & evaluate
-│   │   ├── data/              # Training datasets
-│   │   └── saved_models/      # Trained model files
+│   ├── ml/
+│   │   ├── models/
+│   │   │   └── resnet_model.py      # ResNet architecture
+│   │   ├── training/
+│   │   │   ├── train.py             # Training script
+│   │   │   └── evaluate.py          # Evaluation script
+│   │   ├── utils/
+│   │   │   ├── preprocessing.py     # Data preprocessing
+│   │   │   └── augmentations.py     # Data augmentation
+│   │   ├── data/                    # Training datasets
+│   │   └── saved_models/            # Trained model files
 │   │
-│   ├── requirements.txt       # Python dependencies
-│   ├── alembic.ini           # Database migration config
-│   └── .env                  # Environment variables
+│   ├── requirements.txt
+│   ├── alembic.ini
+│   └── .env
 │
-├── frontend/                  # React frontend
+├── frontend/
 │   ├── src/
-│   │   ├── pages/            # Main pages
+│   │   ├── pages/
 │   │   │   ├── Login.jsx
 │   │   │   ├── Signup.jsx
 │   │   │   ├── Dashboard.jsx
-│   │   │   ├── Scan.jsx      # Upload & detect
+│   │   │   ├── Scan.jsx
 │   │   │   ├── History.jsx
 │   │   │   └── Chat.jsx
-│   │   ├── components/       # Reusable UI components
-│   │   ├── services/         # API calls
-│   │   └── context/          # Global state (auth)
+│   │   ├── components/
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── Sidebar.jsx
+│   │   │   ├── UploadCard.jsx
+│   │   │   └── PrivateRoute.jsx
+│   │   ├── services/
+│   │   │   └── api.js               # API client
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx      # Authentication context
+│   │   └── main.jsx
 │   │
-│   ├── package.json          # Node dependencies
-│   └── vite.config.js        # Build configuration
+│   ├── package.json
+│   └── vite.config.js
 │
-├── docker-compose.yml        # Run everything with Docker
-├── .gitignore               # Files to ignore in Git
-├── README.md                # You are here!
-└── SETUP.md                 # Detailed setup guide
+├── docker-compose.yml
+├── .gitignore
+├── README.md
+└── SETUP.md
 ```
 
 ---
 
-## 🚀 Quick Start Guide
+## Installation and Setup
 
-### Prerequisites (What You Need Installed)
+### Prerequisites
 
-1. **Python 3.11+** - [Download here](https://www.python.org/downloads/)
-2. **Node.js 18+** - [Download here](https://nodejs.org/)
-3. **Git** - [Download here](https://git-scm.com/)
+- Python 3.11 or higher
+- Node.js 18 or higher
+- Git
 
-### Step 1: Clone the Repository
+### Backend Setup
 
+1. Clone the repository:
 ```bash
 git clone https://github.com/chandu1234678/AgroSight.git
 cd AgroSight
 ```
 
-### Step 2: Setup Backend (Python)
-
+2. Navigate to backend directory:
 ```bash
-# Navigate to backend folder
 cd backend
+```
 
-# Create virtual environment (isolated Python environment)
+3. Create and activate virtual environment:
+```bash
+# Windows
 python -m venv venv
-
-# Activate virtual environment
-# On Windows:
 .\venv\Scripts\activate
-# On Mac/Linux:
+
+# macOS/Linux
+python3 -m venv venv
 source venv/bin/activate
+```
 
-# Install Python packages
+4. Install dependencies:
+```bash
 pip install -r requirements.txt
+```
 
-# Setup database
+5. Run database migrations:
+```bash
 alembic upgrade head
+```
 
-# Start backend server
+6. Start the backend server:
+```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-✅ Backend is now running at: **http://localhost:8000**  
-📚 API Documentation: **http://localhost:8000/docs**
+The backend API will be available at `http://localhost:8000`  
+API documentation: `http://localhost:8000/docs`
 
-### Step 3: Setup Frontend (React)
+### Frontend Setup
 
-Open a **new terminal** window:
-
+1. Open a new terminal and navigate to frontend directory:
 ```bash
-# Navigate to frontend folder
 cd frontend
+```
 
-# Install Node packages
+2. Install dependencies:
+```bash
 npm install
+```
 
-# Start development server
+3. Start the development server:
+```bash
 npm run dev
 ```
 
-✅ Frontend is now running at: **http://localhost:5173**
-
-### Step 4: Open in Browser
-
-Visit **http://localhost:5173** and start using AgroSight! 🎉
+The frontend application will be available at `http://localhost:5173`
 
 ---
 
-## 📊 ML Pipeline - How the AI Works
+## Machine Learning Pipeline
+
+### Model Architecture
 
 ```mermaid
 graph LR
-    A[Plant Image] --> B[Preprocessing]
-    B --> C[Resize to 224x224]
-    C --> D[Normalize Pixels]
-    D --> E[ResNet Model]
+    A[Input Image] --> B[Preprocessing]
+    B --> C[Resize 224x224]
+    C --> D[Normalization]
+    D --> E[ResNet Backbone]
     E --> F[Feature Extraction]
-    F --> G[Classification Layer]
+    F --> G[Classification Head]
     G --> H[Disease Prediction]
     H --> I[Confidence Score]
     
@@ -255,168 +294,204 @@ graph LR
 ```mermaid
 graph TD
     A[PlantVillage Dataset] --> B[Data Augmentation]
-    B --> C[Rotation, Flip, Blur]
-    C --> D[ResNet18 Pretrained]
+    B --> C[Transformations]
+    C --> D[Pretrained ResNet18]
     D --> E[Transfer Learning]
-    E --> F[Fine-tune on Plant Data]
-    F --> G[Evaluate Accuracy]
-    G --> H{Accuracy > 90%?}
-    H -->|Yes| I[Save Model]
-    H -->|No| F
-    I --> J[Deploy to Production]
+    E --> F[Fine-tuning]
+    F --> G[Model Evaluation]
+    G --> H{Accuracy Check}
+    H -->|Pass| I[Save Model]
+    H -->|Fail| F
+    I --> J[Production Deployment]
     
     style A fill:#90EE90
     style D fill:#ee4c2c
     style I fill:#FFD700
 ```
 
+### Data Augmentation Techniques
+
+- Random rotation (±15 degrees)
+- Horizontal and vertical flips
+- Random brightness and contrast adjustment
+- Gaussian noise injection
+- Motion blur simulation
+- Random cropping and scaling
+
 ---
 
-## 🔐 Environment Variables
+## Configuration
 
-Create a `.env` file in the `backend/` folder:
+### Environment Variables
+
+Create a `.env` file in the `backend/` directory:
 
 ```env
-# Database
+# Database Configuration
 DATABASE_URL=sqlite:///./agrosight.db
 
 # Security
-SECRET_KEY=your-super-secret-key-here-change-this
+SECRET_KEY=your-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# AI APIs (Optional - for chat features)
+# External APIs (Optional)
 GEMINI_API_KEY=your-gemini-api-key
 CEREBRAS_API_KEY=your-cerebras-api-key
 
-# Storage (Optional - for cloud image storage)
+# Storage (Optional)
 CLOUDINARY_URL=your-cloudinary-url
 
-# ML Model Paths
+# ML Model Configuration
 MODEL_PATH=ml/saved_models/resnet_plant_disease.pth
 CLASS_NAMES_PATH=ml/saved_models/class_names.json
 ```
 
 ---
 
-## 🎓 For Students - Learning Resources
+## API Endpoints
 
-### What You'll Learn
+### Authentication
+- `POST /api/auth/signup` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Get current user
 
-1. **Full-Stack Development**
-   - Frontend: React components, state management, routing
-   - Backend: REST APIs, authentication, database operations
+### Disease Detection
+- `POST /api/scan` - Upload image for disease detection
+- `GET /api/scan/{scan_id}` - Get scan details
+- `GET /api/scan/history` - Get user scan history
 
-2. **Machine Learning**
-   - Transfer learning with PyTorch
-   - Image classification with CNNs
-   - Model training and evaluation
+### Dashboard
+- `GET /api/dashboard/stats` - Get user statistics
 
-3. **DevOps**
-   - Docker containerization
-   - Environment management
-   - Git version control
-
-### Key Concepts
-
-**Transfer Learning**: Instead of training from scratch, we use a pre-trained ResNet model (trained on millions of images) and fine-tune it for plant diseases. This saves time and improves accuracy!
-
-**JWT Authentication**: JSON Web Tokens are like digital ID cards. When you login, you get a token that proves who you are for future requests.
-
-**REST API**: A way for frontend and backend to communicate using HTTP requests (GET, POST, PUT, DELETE).
+### Chat Assistant
+- `POST /api/chat` - Send message to AI assistant
+- `GET /api/chat/history` - Get chat history
 
 ---
 
-## 🐳 Docker Deployment (Advanced)
+## Docker Deployment
 
-Run everything with one command:
+Run the entire application stack using Docker Compose:
 
 ```bash
 docker-compose up --build
 ```
 
-This starts:
+This will start:
 - Backend API (port 8000)
-- Frontend (port 5173)
+- Frontend application (port 5173)
 - PostgreSQL database (port 5432)
 
 ---
 
-## 📸 Screenshots
+## Testing
 
-### Dashboard
-![Dashboard](https://via.placeholder.com/800x400?text=Dashboard+Screenshot)
+### Backend Tests
+```bash
+cd backend
+pytest
+```
 
-### Disease Detection
-![Scan](https://via.placeholder.com/800x400?text=Scan+Screenshot)
-
-### Chat Assistant
-![Chat](https://via.placeholder.com/800x400?text=Chat+Screenshot)
+### Frontend Tests
+```bash
+cd frontend
+npm test
+```
 
 ---
 
-## 🤝 Contributing
+## Technical Concepts
 
-We welcome contributions! Here's how:
+### Transfer Learning
+The application uses transfer learning by leveraging a pre-trained ResNet model trained on ImageNet. The final classification layer is replaced and fine-tuned on plant disease datasets, significantly reducing training time and improving accuracy.
+
+### JWT Authentication
+JSON Web Tokens (JWT) are used for stateless authentication. Upon successful login, users receive a token that must be included in subsequent API requests via the Authorization header.
+
+### REST API Design
+The backend follows RESTful principles with proper HTTP methods (GET, POST, PUT, DELETE), status codes, and resource-based URLs for intuitive API interaction.
+
+---
+
+## Troubleshooting
+
+### Backend Issues
+
+**Port already in use:**
+```bash
+# Find and kill process on port 8000
+# Windows
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# macOS/Linux
+lsof -ti:8000 | xargs kill -9
+```
+
+**Database migration errors:**
+```bash
+# Reset database
+rm agrosight.db
+alembic upgrade head
+```
+
+### Frontend Issues
+
+**Module not found errors:**
+```bash
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**Build errors:**
+```bash
+# Clear Vite cache
+rm -rf node_modules/.vite
+npm run dev
+```
+
+---
+
+## Contributing
+
+Contributions are welcome. Please follow these steps:
 
 1. Fork the repository
-2. Create a new branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Commit (`git commit -m 'Add amazing feature'`)
-5. Push (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
+2. Create a feature branch (`git checkout -b feature/new-feature`)
+3. Commit your changes (`git commit -m 'Add new feature'`)
+4. Push to the branch (`git push origin feature/new-feature`)
+5. Open a Pull Request
 
 ---
 
-## 🐛 Troubleshooting
-
-### Backend won't start?
-- Make sure virtual environment is activated
-- Check if port 8000 is already in use
-- Verify all dependencies are installed: `pip list`
-
-### Frontend won't start?
-- Delete `node_modules` and run `npm install` again
-- Check if port 5173 is available
-- Clear npm cache: `npm cache clean --force`
-
-### Database errors?
-- Delete `agrosight.db` and run `alembic upgrade head` again
-- Check database URL in `.env` file
-
----
-
-## 📚 Additional Resources
+## Learning Resources
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [React Documentation](https://react.dev/)
 - [PyTorch Tutorials](https://pytorch.org/tutorials/)
+- [Transfer Learning Guide](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html)
 - [PlantVillage Dataset](https://www.kaggle.com/datasets/emmarex/plantdisease)
 
 ---
 
-## 📝 License
+## License
 
-MIT License - feel free to use this project for learning!
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Chandu**  
 GitHub: [@chandu1234678](https://github.com/chandu1234678)  
-Project Link: [AgroSight](https://github.com/chandu1234678/AgroSight)
+Project: [AgroSight](https://github.com/chandu1234678/AgroSight)
 
 ---
 
-## ⭐ Show Your Support
+## Acknowledgments
 
-If this project helped you learn something new, give it a ⭐️ on GitHub!
-
-**Connect with me:**
-- 💼 LinkedIn: [Add your LinkedIn]
-- 📧 Email: [Add your email]
-
----
-
-**Made with ❤️ for farmers and students learning AI/ML**
+- PlantVillage dataset for training data
+- PyTorch team for the deep learning framework
+- FastAPI community for the excellent web framework
