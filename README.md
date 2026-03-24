@@ -2,10 +2,7 @@
 
 > A full-stack web application that uses deep learning to identify plant diseases from images, providing farmers with instant diagnosis and treatment recommendations.
 
-[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18.2-61dafb.svg)](https://reactjs.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.1-red.svg)](https://pytorch.org/)
+**Technologies:** Python 3.11 | FastAPI 0.104 | React 18.2 | PyTorch 2.1
 
 ---
 
@@ -59,10 +56,6 @@ graph TB
     E --> O
     H --> J
     J --> K
-    
-    style A fill:#61dafb
-    style F fill:#009688
-    style K fill:#ee4c2c
 ```
 
 ---
@@ -283,10 +276,6 @@ graph LR
     F --> G[Classification Head]
     G --> H[Disease Prediction]
     H --> I[Confidence Score]
-    
-    style A fill:#90EE90
-    style E fill:#ee4c2c
-    style H fill:#FFD700
 ```
 
 ### Training Pipeline
@@ -303,10 +292,6 @@ graph TD
     H -->|Pass| I[Save Model]
     H -->|Fail| F
     I --> J[Production Deployment]
-    
-    style A fill:#90EE90
-    style D fill:#ee4c2c
-    style I fill:#FFD700
 ```
 
 ### Data Augmentation Techniques
