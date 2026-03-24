@@ -331,13 +331,19 @@ class AIModelService:
             # Top-5 class probabilities
             probs_np = probs.squeeze().cpu().numpy()
             top5_idx = probs_np.argsort()[::-1][:5]
-            top5 = [
-                {
-                    "label": cls.class_names[i].replace("_", " ").title(),
-                    "prob": round(float(probs_np[i]) * 100, 2)   # 2 decimals so 0.03% shows
-                }
-                for i in top5_idx
-            ]
+            top5 = []
+            for i in top5_idx:
+                raw_name = cls.class_names[i]
+                # Clean up label: "Apple___Apple_scab" → "Apple Scab"
+                parts = [p for p in raw_name.replace("___", "_").replace(",", "").split("_") if p]
+                # Remove consecutive duplicate words (e.g. Apple Apple → Apple)
+                deduped = []
+                for p in parts:
+                    if not deduped or p.lower() != deduped[-1].lower():
+                        deduped.append(p.capitalize())
+                label = " ".join(deduped)
+                prob_val = round(float(probs_np[i]) * 100, 2)
+                top5.append({"label": label, "prob": prob_val})
             print(f"✓ Integrated Gradients computed")
 
             return {

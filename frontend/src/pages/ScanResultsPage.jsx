@@ -316,19 +316,20 @@ const ScanResultsPage = () => {
                   {Array.isArray(result.top5_predictions) && result.top5_predictions.length > 0 && (
                     <div className="bg-surface-container-low rounded-xl p-5 space-y-3">
                       <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold">Top-5 Predictions</p>
-                      {result.top5_predictions.map((p, i) => (
-                        <div key={i} className="space-y-1">
-                          <div className="flex justify-between text-[11px]">
-                            <span className={`font-medium truncate max-w-[70%] ${i === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{p.label}</span>
-                            <span className={i === 0 ? 'text-primary font-bold' : 'text-on-surface-variant'}>{p.prob}%</span>
+                      {result.top5_predictions.map((p, i) => {
+                        // Log scale so tiny values (0.01%) still show a visible bar
+                        const barPct = i === 0 ? p.prob : p.prob > 0 ? Math.max(Math.log10(p.prob + 0.001) * 20 + 60, 2) : 2;
+                        const label = p.prob === 0 ? '<0.01%' : `${p.prob}%`;
+                        return (
+                          <div key={i} className="space-y-1">
+                            <div className="flex justify-between text-[11px]">
+                              <span className={`font-medium truncate max-w-[72%] ${i === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{p.label}</span>
+                              <span className={i === 0 ? 'text-primary font-bold' : 'text-on-surface-variant'}>{label}</span>
+                            </div>
+                            <AnimatedBar pct={barPct} colorClass={i === 0 ? 'bg-primary' : 'bg-primary/25'} height="h-1.5" />
                           </div>
-                          <AnimatedBar
-                            pct={i === 0 ? p.prob : Math.max(p.prob, 0.5)}
-                            colorClass={i === 0 ? 'bg-primary' : 'bg-primary/30'}
-                            height="h-1.5"
-                          />
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
