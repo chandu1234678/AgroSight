@@ -52,9 +52,8 @@ def _pil_to_b64(pil_img, fmt="JPEG", quality=88):
 
 def _overlay_jet(original_pil, cam_np):
     """
-    Overlay multi-scale Grad-CAM++ heatmap on original image.
-    cam_np is already at 224x224 (model input resolution).
-    We scale it to the original image size using bilateral-filtered upsampling.
+    Overlay Grad-CAM++ heatmap on original image.
+    cam_np is (7,7) — upsampled to original image size.
     """
     import numpy as np
     from PIL import Image
@@ -63,23 +62,20 @@ def _overlay_jet(original_pil, cam_np):
     ow, oh = original_pil.size
     orig_np = np.array(original_pil.convert("RGB"))
 
-    # cam_np is 224x224 — scale to original size
-    cam_r = cv2.resize(cam_np, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    # Upsample 7x7 → original size with cubic interpolation for smoother result
+    cam_r = cv2.resize(cam_np, (ow, oh), interpolation=cv2.INTER_CUBIC)
+    cam_r = np.clip(cam_r, 0, 1)
 
-    # Edge-preserving smooth with bilateral filter
-    cam_u8 = (cam_r * 255).astype(np.uint8)
-    cam_smooth = cv2.bilateralFilter(cam_u8, d=7, sigmaColor=50, sigmaSpace=50).astype(np.float32) / 255.0
-
-    # Sharpen: suppress bottom 80th percentile so only lesion spots stay hot
-    cam_sharp = _sharpen_cam(cam_smooth, percentile=80)
+    # Mild sharpening — only suppress bottom 60%, keep the rest visible
+    cam_sharp = _sharpen_cam(cam_r, percentile=60)
 
     # Jet colormap
     heat = cv2.applyColorMap((cam_sharp * 255).astype(np.uint8), cv2.COLORMAP_JET)
     heat = cv2.cvtColor(heat, cv2.COLOR_BGR2RGB)
 
-    # Per-pixel alpha: transparent where cam is low, opaque where hot
-    alpha = (cam_sharp ** 0.6)[:, :, np.newaxis]
-    blend = (orig_np * (1 - alpha * 0.8) + heat * alpha * 0.8).astype(np.uint8)
+    # Per-pixel blend: alpha scales with activation strength
+    alpha = cam_sharp[:, :, np.newaxis]
+    blend = (orig_np * (1 - alpha * 0.65) + heat * alpha * 0.65).astype(np.uint8)
 
     return Image.fromarray(blend), cam_r
 
@@ -182,40 +178,26 @@ class AIModelService:
             cls._transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
 
-    # ── Grad-CAM++ multi-scale ────────────────────────────────────────────────
+    # ── Grad-CAM++ (layer4 only — clean and reliable) ────────────────────────
 
     @classmethod
     def _gradcam(cls, img_tensor, class_idx):
         """
-        Multi-scale Grad-CAM++:
-        Hooks layer2 (28x28), layer3 (14x14), and layer4 (7x7).
-        Each layer's cam is weighted by its gradient magnitude and fused.
-        This gives fine-grained localisation of small lesions that a single
-        7x7 layer4 cam cannot resolve.
-
-        Returns numpy (224,224) in [0,1] — already at model input resolution.
+        Grad-CAM++ on layer4[-1].conv2 only.
+        Returns numpy (7,7) in [0,1] — caller upsamples to display size.
         """
         import numpy as np
         torch = cls._torch
 
-        layers = {
-            'l2': cls.model.layer2[-1].conv2,   # 28x28 — fine detail
-            'l3': cls.model.layer3[-1].conv2,   # 14x14 — mid scale
-            'l4': cls.model.layer4[-1].conv2,   # 7x7   — semantic
-        }
-        _acts  = {k: [None] for k in layers}
-        _grads = {k: [None] for k in layers}
+        target = cls.model.layer4[-1].conv2
+        _act  = [None]
+        _grad = [None]
 
-        handles = []
-        for k, layer in layers.items():
-            def make_fwd(key):
-                def fwd(m, i, o): _acts[key][0] = o
-                return fwd
-            def make_bwd(key):
-                def bwd(m, gi, go): _grads[key][0] = go[0].detach()
-                return bwd
-            handles.append(layer.register_forward_hook(make_fwd(k)))
-            handles.append(layer.register_full_backward_hook(make_bwd(k)))
+        def fwd(m, i, o): _act[0] = o
+        def bwd(m, gi, go): _grad[0] = go[0].detach()
+
+        fh = target.register_forward_hook(fwd)
+        bh = target.register_full_backward_hook(bwd)
 
         try:
             cls.model.zero_grad()
@@ -224,49 +206,28 @@ class AIModelService:
                 out = cls.model(x)
                 out[0, class_idx].backward()
         finally:
-            for h in handles:
-                h.remove()
+            fh.remove()
+            bh.remove()
 
-        cams = []
-        weights_sum = []
+        if _act[0] is None or _grad[0] is None:
+            return _gaussian_fallback(7, 7)
 
-        for k in ['l2', 'l3', 'l4']:
-            act  = _acts[k][0]
-            grad = _grads[k][0]
-            if act is None or grad is None:
-                continue
+        act  = _act[0].detach()   # (1, C, 7, 7)
+        grad = _grad[0]           # (1, C, 7, 7)
 
-            act  = act.detach()
+        # Grad-CAM++ weights
+        grad2 = grad ** 2
+        grad3 = grad ** 3
+        denom = 2.0 * grad2 + (act * grad3).sum(dim=(2, 3), keepdim=True) + 1e-7
+        alpha = grad2 / denom
+        w     = (alpha * torch.relu(grad)).sum(dim=(2, 3), keepdim=True)
 
-            # Grad-CAM++ alpha weights
-            grad2 = grad ** 2
-            grad3 = grad ** 3
-            denom = 2.0 * grad2 + (act * grad3).sum(dim=(2, 3), keepdim=True) + 1e-7
-            alpha = grad2 / denom
-            w     = (alpha * torch.relu(grad)).sum(dim=(2, 3), keepdim=True)
+        cam = torch.relu((w * act).sum(dim=1)).squeeze().cpu().numpy()
 
-            cam_k = torch.relu((w * act).sum(dim=1)).squeeze().cpu().numpy()
+        if cam.max() < 1e-7:
+            return _gaussian_fallback(7, 7)
 
-            if cam_k.max() < 1e-7:
-                continue
-
-            cam_k = _norm01(cam_k)
-
-            # Upsample to 224x224 (model input size)
-            import cv2
-            cam_k = cv2.resize(cam_k, (224, 224), interpolation=cv2.INTER_LINEAR)
-
-            # Weight each scale by its mean gradient magnitude (higher = more informative)
-            scale_weight = float(grad.abs().mean().cpu())
-            cams.append(cam_k * scale_weight)
-            weights_sum.append(scale_weight)
-
-        if not cams:
-            return _gaussian_fallback(224, 224)
-
-        # Weighted average across scales
-        fused = sum(cams) / sum(weights_sum)
-        return _norm01(fused)
+        return _norm01(cam)
 
     # ── Integrated Gradients ─────────────────────────────────────────────────
 
