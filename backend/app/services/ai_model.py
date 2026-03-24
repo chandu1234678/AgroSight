@@ -52,23 +52,47 @@ def _pil_to_b64(pil_img, fmt="JPEG", quality=88):
 
 def _overlay_jet(original_pil, cam_np):
     """
-    Blend jet-colormap heatmap over original.
-    Sharpens the cam first so only high-activation spots stay red.
+    Overlay Grad-CAM++ heatmap on original image.
+    Uses guided upsampling (joint bilateral filter) so the heatmap
+    follows actual image edges rather than being a blurry blob.
     Returns (PIL image, resized cam at original resolution).
     """
     import numpy as np
     from PIL import Image
     import cv2
+
     ow, oh = original_pil.size
+    orig_np = np.array(original_pil.convert("RGB"))
+
+    # Step 1: bilinear upsample to original size
     cam_r = cv2.resize(cam_np, (ow, oh), interpolation=cv2.INTER_LINEAR)
-    # Sharpen: suppress background, keep only top activations
-    cam_sharp = _sharpen_cam(cam_r, percentile=75)
-    heat  = cv2.applyColorMap((cam_sharp * 255).astype(np.uint8), cv2.COLORMAP_JET)
-    heat  = cv2.cvtColor(heat, cv2.COLOR_BGR2RGB)
-    orig  = np.array(original_pil.convert("RGB"))
-    # Blend more original where activation is low, more heatmap where it's high
-    alpha = cam_sharp[:, :, np.newaxis]  # per-pixel blend
-    blend = (orig * (1 - alpha * 0.7) + heat * alpha * 0.7).astype(np.uint8)
+
+    # Step 2: guided filter — sharpens cam edges to match image structure
+    # Convert guide to grayscale float
+    guide = cv2.cvtColor(orig_np, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
+    cam_f = cam_r.astype(np.float32)
+
+    # Try guided filter (opencv-contrib), fall back to bilateral filter
+    try:
+        cam_guided = cv2.ximgproc.guidedFilter(
+            guide=guide, src=cam_f, radius=8, eps=1e-3
+        )
+    except AttributeError:
+        # Bilateral filter: edge-preserving smoothing without contrib
+        cam_u8 = (cam_f * 255).astype(np.uint8)
+        cam_guided = cv2.bilateralFilter(cam_u8, d=9, sigmaColor=75, sigmaSpace=75).astype(np.float32) / 255.0
+
+    # Step 3: aggressive sharpening — keep only top 80th percentile
+    cam_sharp = _sharpen_cam(cam_guided, percentile=80)
+
+    # Step 4: jet colormap
+    heat = cv2.applyColorMap((cam_sharp * 255).astype(np.uint8), cv2.COLORMAP_JET)
+    heat = cv2.cvtColor(heat, cv2.COLOR_BGR2RGB)
+
+    # Step 5: per-pixel alpha blend — transparent where cam is low
+    alpha = cam_sharp[:, :, np.newaxis] ** 0.7   # gamma < 1 spreads the blend slightly
+    blend = (orig_np * (1 - alpha * 0.75) + heat * alpha * 0.75).astype(np.uint8)
+
     return Image.fromarray(blend), cam_r
 
 
@@ -170,13 +194,17 @@ class AIModelService:
             cls._transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
 
-    # ── GradCAM ──────────────────────────────────────────────────────────────
+    # ── Grad-CAM++ ───────────────────────────────────────────────────────────
 
     @classmethod
     def _gradcam(cls, img_tensor, class_idx):
         """
-        GradCAM on layer4[-1].conv2.
-        img_tensor: (1,3,224,224) on cls.device, no grad needed on input.
+        Grad-CAM++ on ResNet34 layer4[-1].conv2.
+
+        Grad-CAM++ uses second-order gradient weighting per spatial location,
+        giving much sharper and more precise lesion localisation than standard
+        GradCAM which uses a single global average weight per channel.
+
         Returns numpy (H,W) in [0,1].
         """
         import numpy as np
@@ -187,8 +215,7 @@ class AIModelService:
         _grad = [None]
 
         def fwd(m, i, o):
-            # store WITHOUT detach so backward can flow through
-            _act[0] = o
+            _act[0] = o   # keep in graph
 
         def bwd(m, gi, go):
             _grad[0] = go[0].detach()
@@ -199,25 +226,37 @@ class AIModelService:
         try:
             cls.model.zero_grad()
             with torch.enable_grad():
-                # fresh tensor — must require grad so hooks fire
-                x = img_tensor.detach().clone().requires_grad_(True)
+                x   = img_tensor.detach().clone().requires_grad_(True)
                 out = cls.model(x)
-                out[0, class_idx].backward()
+                score = out[0, class_idx]
+                score.backward()
         finally:
             fh.remove()
             bh.remove()
 
         if _act[0] is None or _grad[0] is None:
-            print("GradCAM: hooks empty — fallback")
+            print("GradCAM++: hooks empty — fallback")
             return _gaussian_fallback(7, 7)
 
-        act  = _act[0].detach()          # (1,C,H,W)
-        grad = _grad[0]                  # (1,C,H,W)
-        w    = grad.mean(dim=(2, 3), keepdim=True)
-        cam  = torch.relu((w * act).sum(dim=1)).squeeze().cpu().numpy()
+        act  = _act[0].detach()   # (1, C, H, W)
+        grad = _grad[0]           # (1, C, H, W)
+
+        # ── Grad-CAM++ weighting ─────────────────────────────────────────
+        # alpha_kc = grad^2 / (2*grad^2 + sum(act * grad^3) + eps)
+        grad2 = grad ** 2
+        grad3 = grad ** 3
+        # sum over spatial dims for denominator
+        denom = 2.0 * grad2 + (act * grad3).sum(dim=(2, 3), keepdim=True) + 1e-7
+        alpha = grad2 / denom                          # (1, C, H, W)
+
+        # Weight = sum over spatial of (alpha * relu(score_grad))
+        # score_grad here is just grad (already backpropped w.r.t. score)
+        weights = (alpha * torch.relu(grad)).sum(dim=(2, 3), keepdim=True)  # (1,C,1,1)
+
+        cam = torch.relu((weights * act).sum(dim=1)).squeeze().cpu().numpy()  # (H,W)
 
         if cam.max() < 1e-7:
-            print("GradCAM: all-zero — fallback")
+            print("GradCAM++: all-zero — fallback")
             return _gaussian_fallback(*cam.shape)
 
         return _norm01(cam)
