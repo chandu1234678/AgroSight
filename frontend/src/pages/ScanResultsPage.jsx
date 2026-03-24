@@ -214,56 +214,78 @@ const ScanResultsPage = () => {
             </div>
           </section>
 
-          {/* ── VISUAL ANALYSIS — GradCAM + Area Stats ────────────────────── */}
+          {/* ── VISUAL ANALYSIS — GradCAM + Integrated Gradients ─────────── */}
           {(result.gradcam_url || affectedPct > 0) && (
             <section className="space-y-6">
               <div className="flex items-center gap-6">
                 <h3 className="text-2xl font-bold font-headline tracking-tight text-on-surface whitespace-nowrap">Visual Analysis</h3>
                 <div className="h-px flex-1 bg-outline-variant/20 hidden md:block" />
-                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold hidden md:block">GradCAM · Activation Heatmap</span>
+                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold hidden md:block">GradCAM · Integrated Gradients</span>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Image tabs */}
+                {/* Image viewer with 3 tabs */}
                 <div className="bg-surface-container-low rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-outline-variant/10 flex gap-2">
-                    {['original', 'heatmap'].map((tab) => (
+                  <div className="px-4 py-3 border-b border-outline-variant/10 flex gap-2 flex-wrap">
+                    {['original', 'gradcam', 'attribution'].map((tab) => (
                       <button key={tab} onClick={() => setHeatTab(tab)}
                         className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${heatTab === tab ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-highest'}`}>
-                        {tab}
+                        {tab === 'gradcam' ? 'GradCAM' : tab === 'attribution' ? 'Attribution (IG)' : 'Original'}
                       </button>
                     ))}
                   </div>
-                  <div className="relative">
-                    {heatTab === 'original' ? (
+
+                  <div className="relative bg-surface-container-highest">
+                    {heatTab === 'original' && (
                       result.image_url
                         ? <img src={result.image_url} alt="Original" className="w-full h-auto object-contain" />
-                        : <div className="w-full h-48 bg-surface-container-highest flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">image</span></div>
-                    ) : (
+                        : <div className="h-48 flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">image</span></div>
+                    )}
+                    {heatTab === 'gradcam' && (
                       result.gradcam_url
-                        ? <img src={result.gradcam_url} alt="GradCAM heatmap" className="w-full h-auto object-contain" />
-                        : <div className="w-full h-48 bg-surface-container-highest flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">blur_on</span></div>
+                        ? <img src={result.gradcam_url} alt="GradCAM" className="w-full h-auto object-contain" />
+                        : <div className="h-48 flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">blur_on</span></div>
+                    )}
+                    {heatTab === 'attribution' && (
+                      result.ig_url
+                        ? <img src={result.ig_url} alt="Integrated Gradients" className="w-full h-auto object-contain" />
+                        : <div className="h-48 flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">auto_awesome</span></div>
                     )}
                   </div>
-                  <div className="px-4 py-3 flex items-center gap-3">
-                    <span className="text-[10px] text-on-surface-variant">Low</span>
-                    <div className="flex-1 h-2 rounded-full" style={{ background: 'linear-gradient(to right,#00007f,#0000ff,#00ffff,#00ff00,#ffff00,#ff7f00,#ff0000)' }} />
-                    <span className="text-[10px] text-on-surface-variant">High</span>
+
+                  {/* Legend */}
+                  <div className="px-4 py-3 border-t border-outline-variant/10">
+                    {heatTab === 'gradcam' && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-on-surface-variant">Low attention</span>
+                        <div className="flex-1 h-2 rounded-full" style={{ background: 'linear-gradient(to right,#00007f,#0000ff,#00ffff,#00ff00,#ffff00,#ff7f00,#ff0000)' }} />
+                        <span className="text-[10px] text-on-surface-variant">High attention</span>
+                      </div>
+                    )}
+                    {heatTab === 'attribution' && (
+                      <div className="flex items-center gap-4 text-[10px] text-on-surface-variant">
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-500 inline-block" />Green = disease markers (positive)</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-500 inline-block" />Red = healthy tissue (negative)</span>
+                      </div>
+                    )}
+                    {heatTab === 'original' && (
+                      <p className="text-[10px] text-on-surface-variant">Original uploaded image — no processing applied</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Stats column */}
+                {/* Stats + top-5 */}
                 <div className="space-y-4">
                   {/* Affected area */}
-                  <div className="bg-surface-container-low rounded-xl p-6 space-y-3">
+                  <div className="bg-surface-container-low rounded-xl p-5 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-error text-lg">crisis_alert</span>
+                        <div className="w-9 h-9 rounded-lg bg-error/10 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-error text-base">crisis_alert</span>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold">Affected Area</p>
-                          <p className="text-[10px] text-on-surface-variant/60">High-activation pixels</p>
+                          <p className="text-[10px] text-on-surface-variant/60">GradCAM high-activation zone</p>
                         </div>
                       </div>
                       <span className={`text-3xl font-black tracking-tighter ${affectedBarColor.replace('bg-', 'text-')}`}>{affectedPct}%</span>
@@ -273,11 +295,11 @@ const ScanResultsPage = () => {
                   </div>
 
                   {/* Spread risk */}
-                  <div className="bg-surface-container-low rounded-xl p-6 space-y-3">
+                  <div className="bg-surface-container-low rounded-xl p-5 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-secondary text-lg">trending_up</span>
+                        <div className="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-secondary text-base">trending_up</span>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold">Spread Risk</p>
@@ -290,8 +312,24 @@ const ScanResultsPage = () => {
                     <p className="text-xs text-on-surface-variant">{spreadLabel}</p>
                   </div>
 
+                  {/* Top-5 predictions */}
+                  {Array.isArray(result.top5_predictions) && result.top5_predictions.length > 0 && (
+                    <div className="bg-surface-container-low rounded-xl p-5 space-y-3">
+                      <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold">Top-5 Predictions</p>
+                      {result.top5_predictions.map((p, i) => (
+                        <div key={i} className="space-y-1">
+                          <div className="flex justify-between text-[11px]">
+                            <span className={`font-medium truncate max-w-[70%] ${i === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{p.label}</span>
+                            <span className={i === 0 ? 'text-primary font-bold' : 'text-on-surface-variant'}>{p.prob}%</span>
+                          </div>
+                          <AnimatedBar pct={p.prob} colorClass={i === 0 ? 'bg-primary' : 'bg-surface-container-highest'} height="h-1.5" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* 7-day projection */}
-                  <div className="bg-surface-container-low rounded-xl p-6 space-y-3">
+                  <div className="bg-surface-container-low rounded-xl p-5 space-y-3">
                     <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold">7-Day Damage Projection</p>
                     {[1, 3, 7].map((day) => {
                       const proj = Math.min(affectedPct + growthRate * day, 95);
@@ -303,7 +341,7 @@ const ScanResultsPage = () => {
                         </div>
                       );
                     })}
-                    <p className="text-[10px] text-on-surface-variant/50 mt-1">Projection based on current spread rate. Treat immediately to halt progression.</p>
+                    <p className="text-[10px] text-on-surface-variant/50">Projection based on current spread rate. Treat immediately to halt progression.</p>
                   </div>
                 </div>
               </div>
