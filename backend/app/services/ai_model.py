@@ -52,10 +52,9 @@ def _pil_to_b64(pil_img, fmt="JPEG", quality=88):
 
 def _overlay_jet(original_pil, cam_np):
     """
-    Overlay Grad-CAM++ heatmap on original image.
-    Uses guided upsampling (joint bilateral filter) so the heatmap
-    follows actual image edges rather than being a blurry blob.
-    Returns (PIL image, resized cam at original resolution).
+    Overlay multi-scale Grad-CAM++ heatmap on original image.
+    cam_np is already at 224x224 (model input resolution).
+    We scale it to the original image size using bilateral-filtered upsampling.
     """
     import numpy as np
     from PIL import Image
@@ -64,34 +63,23 @@ def _overlay_jet(original_pil, cam_np):
     ow, oh = original_pil.size
     orig_np = np.array(original_pil.convert("RGB"))
 
-    # Step 1: bilinear upsample to original size
+    # cam_np is 224x224 — scale to original size
     cam_r = cv2.resize(cam_np, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
-    # Step 2: guided filter — sharpens cam edges to match image structure
-    # Convert guide to grayscale float
-    guide = cv2.cvtColor(orig_np, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
-    cam_f = cam_r.astype(np.float32)
+    # Edge-preserving smooth with bilateral filter
+    cam_u8 = (cam_r * 255).astype(np.uint8)
+    cam_smooth = cv2.bilateralFilter(cam_u8, d=7, sigmaColor=50, sigmaSpace=50).astype(np.float32) / 255.0
 
-    # Try guided filter (opencv-contrib), fall back to bilateral filter
-    try:
-        cam_guided = cv2.ximgproc.guidedFilter(
-            guide=guide, src=cam_f, radius=8, eps=1e-3
-        )
-    except AttributeError:
-        # Bilateral filter: edge-preserving smoothing without contrib
-        cam_u8 = (cam_f * 255).astype(np.uint8)
-        cam_guided = cv2.bilateralFilter(cam_u8, d=9, sigmaColor=75, sigmaSpace=75).astype(np.float32) / 255.0
+    # Sharpen: suppress bottom 80th percentile so only lesion spots stay hot
+    cam_sharp = _sharpen_cam(cam_smooth, percentile=80)
 
-    # Step 3: aggressive sharpening — keep only top 80th percentile
-    cam_sharp = _sharpen_cam(cam_guided, percentile=80)
-
-    # Step 4: jet colormap
+    # Jet colormap
     heat = cv2.applyColorMap((cam_sharp * 255).astype(np.uint8), cv2.COLORMAP_JET)
     heat = cv2.cvtColor(heat, cv2.COLOR_BGR2RGB)
 
-    # Step 5: per-pixel alpha blend — transparent where cam is low
-    alpha = cam_sharp[:, :, np.newaxis] ** 0.7   # gamma < 1 spreads the blend slightly
-    blend = (orig_np * (1 - alpha * 0.75) + heat * alpha * 0.75).astype(np.uint8)
+    # Per-pixel alpha: transparent where cam is low, opaque where hot
+    alpha = (cam_sharp ** 0.6)[:, :, np.newaxis]
+    blend = (orig_np * (1 - alpha * 0.8) + heat * alpha * 0.8).astype(np.uint8)
 
     return Image.fromarray(blend), cam_r
 
@@ -194,72 +182,91 @@ class AIModelService:
             cls._transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
 
-    # ── Grad-CAM++ ───────────────────────────────────────────────────────────
+    # ── Grad-CAM++ multi-scale ────────────────────────────────────────────────
 
     @classmethod
     def _gradcam(cls, img_tensor, class_idx):
         """
-        Grad-CAM++ on ResNet34 layer4[-1].conv2.
+        Multi-scale Grad-CAM++:
+        Hooks layer2 (28x28), layer3 (14x14), and layer4 (7x7).
+        Each layer's cam is weighted by its gradient magnitude and fused.
+        This gives fine-grained localisation of small lesions that a single
+        7x7 layer4 cam cannot resolve.
 
-        Grad-CAM++ uses second-order gradient weighting per spatial location,
-        giving much sharper and more precise lesion localisation than standard
-        GradCAM which uses a single global average weight per channel.
-
-        Returns numpy (H,W) in [0,1].
+        Returns numpy (224,224) in [0,1] — already at model input resolution.
         """
         import numpy as np
         torch = cls._torch
 
-        target = cls.model.layer4[-1].conv2
-        _act  = [None]
-        _grad = [None]
+        layers = {
+            'l2': cls.model.layer2[-1].conv2,   # 28x28 — fine detail
+            'l3': cls.model.layer3[-1].conv2,   # 14x14 — mid scale
+            'l4': cls.model.layer4[-1].conv2,   # 7x7   — semantic
+        }
+        _acts  = {k: [None] for k in layers}
+        _grads = {k: [None] for k in layers}
 
-        def fwd(m, i, o):
-            _act[0] = o   # keep in graph
-
-        def bwd(m, gi, go):
-            _grad[0] = go[0].detach()
-
-        fh = target.register_forward_hook(fwd)
-        bh = target.register_full_backward_hook(bwd)
+        handles = []
+        for k, layer in layers.items():
+            def make_fwd(key):
+                def fwd(m, i, o): _acts[key][0] = o
+                return fwd
+            def make_bwd(key):
+                def bwd(m, gi, go): _grads[key][0] = go[0].detach()
+                return bwd
+            handles.append(layer.register_forward_hook(make_fwd(k)))
+            handles.append(layer.register_full_backward_hook(make_bwd(k)))
 
         try:
             cls.model.zero_grad()
             with torch.enable_grad():
                 x   = img_tensor.detach().clone().requires_grad_(True)
                 out = cls.model(x)
-                score = out[0, class_idx]
-                score.backward()
+                out[0, class_idx].backward()
         finally:
-            fh.remove()
-            bh.remove()
+            for h in handles:
+                h.remove()
 
-        if _act[0] is None or _grad[0] is None:
-            print("GradCAM++: hooks empty — fallback")
-            return _gaussian_fallback(7, 7)
+        cams = []
+        weights_sum = []
 
-        act  = _act[0].detach()   # (1, C, H, W)
-        grad = _grad[0]           # (1, C, H, W)
+        for k in ['l2', 'l3', 'l4']:
+            act  = _acts[k][0]
+            grad = _grads[k][0]
+            if act is None or grad is None:
+                continue
 
-        # ── Grad-CAM++ weighting ─────────────────────────────────────────
-        # alpha_kc = grad^2 / (2*grad^2 + sum(act * grad^3) + eps)
-        grad2 = grad ** 2
-        grad3 = grad ** 3
-        # sum over spatial dims for denominator
-        denom = 2.0 * grad2 + (act * grad3).sum(dim=(2, 3), keepdim=True) + 1e-7
-        alpha = grad2 / denom                          # (1, C, H, W)
+            act  = act.detach()
 
-        # Weight = sum over spatial of (alpha * relu(score_grad))
-        # score_grad here is just grad (already backpropped w.r.t. score)
-        weights = (alpha * torch.relu(grad)).sum(dim=(2, 3), keepdim=True)  # (1,C,1,1)
+            # Grad-CAM++ alpha weights
+            grad2 = grad ** 2
+            grad3 = grad ** 3
+            denom = 2.0 * grad2 + (act * grad3).sum(dim=(2, 3), keepdim=True) + 1e-7
+            alpha = grad2 / denom
+            w     = (alpha * torch.relu(grad)).sum(dim=(2, 3), keepdim=True)
 
-        cam = torch.relu((weights * act).sum(dim=1)).squeeze().cpu().numpy()  # (H,W)
+            cam_k = torch.relu((w * act).sum(dim=1)).squeeze().cpu().numpy()
 
-        if cam.max() < 1e-7:
-            print("GradCAM++: all-zero — fallback")
-            return _gaussian_fallback(*cam.shape)
+            if cam_k.max() < 1e-7:
+                continue
 
-        return _norm01(cam)
+            cam_k = _norm01(cam_k)
+
+            # Upsample to 224x224 (model input size)
+            import cv2
+            cam_k = cv2.resize(cam_k, (224, 224), interpolation=cv2.INTER_LINEAR)
+
+            # Weight each scale by its mean gradient magnitude (higher = more informative)
+            scale_weight = float(grad.abs().mean().cpu())
+            cams.append(cam_k * scale_weight)
+            weights_sum.append(scale_weight)
+
+        if not cams:
+            return _gaussian_fallback(224, 224)
+
+        # Weighted average across scales
+        fused = sum(cams) / sum(weights_sum)
+        return _norm01(fused)
 
     # ── Integrated Gradients ─────────────────────────────────────────────────
 
