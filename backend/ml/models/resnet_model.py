@@ -8,8 +8,8 @@ class PlantDiseaseResNet(nn.Module):
     def __init__(self, num_classes: int, pretrained: bool = True):
         super(PlantDiseaseResNet, self).__init__()
         
-        # Load pretrained ResNet18
-        self.resnet = models.resnet18(pretrained=pretrained)
+        # Load pretrained ResNet34 for better performance with large datasets
+        self.resnet = models.resnet34(pretrained=pretrained)
         
         # Replace final layer
         num_features = self.resnet.fc.in_features
@@ -18,16 +18,18 @@ class PlantDiseaseResNet(nn.Module):
     def forward(self, x):
         return self.resnet(x)
 
-def create_model(num_classes: int, architecture: str = "resnet18") -> nn.Module:
+def create_model(num_classes: int, architecture: str = "resnet34") -> nn.Module:
     """Create ResNet model with custom classifier."""
     if architecture == "resnet18":
         model = models.resnet18(pretrained=True)
     elif architecture == "resnet34":
         model = models.resnet34(pretrained=True)
+    elif architecture == "resnet50":
+        model = models.resnet50(pretrained=True)
     else:
         raise ValueError(f"Unsupported architecture: {architecture}")
     
-    # Freeze early layers (optional)
+    # Freeze early layers (optional - uncomment for faster training)
     # for param in model.parameters():
     #     param.requires_grad = False
     

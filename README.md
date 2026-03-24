@@ -284,7 +284,7 @@ graph LR
 graph TD
     A[PlantVillage Dataset] --> B[Data Augmentation]
     B --> C[Transformations]
-    C --> D[Pretrained ResNet18]
+    C --> D[Pretrained ResNet34]
     D --> E[Transfer Learning]
     E --> F[Fine-tuning]
     F --> G[Model Evaluation]

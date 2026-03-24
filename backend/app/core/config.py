@@ -2,26 +2,23 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
-    # Application
+    
     DEBUG: bool = False
     APP_NAME: str = "AgroSight API"
     APP_VERSION: str = "1.0.0"
     
-    # Database - Use async PostgreSQL driver (asyncpg)
-    # Example: postgresql+asyncpg://user:password@localhost:5432/agrosight
-    # For SQLite async: sqlite+aiosqlite:///./agrosight.db
+    
     DATABASE_URL: str = "sqlite+aiosqlite:///./agrosight.db"
     
     # Security & JWT
-    SECRET_KEY: str  # MUST be set in .env - use: openssl rand -hex 32
-    ALGORITHM: str = "HS256"
+    SECRET_KEY: str  
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # External APIs
     GEMINI_API_KEY: Optional[str] = None
     CEREBRAS_API_KEY: Optional[str] = None
     
-    # File Storage (choose one)
+    # File Storage (
     STORAGE_TYPE: str = "local"  # "local" or "s3"
     UPLOAD_DIR: str = "./uploads"  # Used if STORAGE_TYPE == "local"
     AWS_ACCESS_KEY_ID: Optional[str] = None

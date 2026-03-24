@@ -44,7 +44,7 @@ class AIModelService:
         
         # TODO: Load actual trained model when available
         # cls.device = cls._torch.device("cuda" if cls._torch.cuda.is_available() else "cpu")
-        # cls.model = cls._models.resnet18(pretrained=False)
+        # cls.model = cls._models.resnet34(pretrained=False)  # Using ResNet34 for large datasets
         # num_classes = len(cls.class_names)
         # cls.model.fc = cls._nn.Linear(cls.model.fc.in_features, num_classes)
         # cls.model.load_state_dict(cls._torch.load(settings.MODEL_PATH, map_location=cls.device))
