@@ -28,6 +28,7 @@ class Token(BaseModel):
     access_token: str = Field(..., description="JWT access token")
     token_type: str = Field(default="bearer", description="Token type (always 'bearer')")
     expires_in: int = Field(..., description="Token expiration in seconds")
+    user: UserResponse = Field(..., description="User information")
 
 # ============================================================================
 # DISEASE INFO SCHEMAS
@@ -143,4 +144,16 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., description="Human-readable error message")
     detail: Optional[str] = Field(None, description="Technical details (development only)")
     timestamp: datetime = Field(..., description="When error occurred")
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request schema for forgot password."""
+    email: EmailStr = Field(..., description="User email address")
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request schema for password reset."""
+    reset_token: str = Field(..., description="Password reset token")
+    new_password: str = Field(..., min_length=6, description="New password (min 6 chars)")
+
 

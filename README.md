@@ -1,23 +1,24 @@
 # AgroSight - AI-Powered Plant Disease Detection
 
-> A full-stack web application that uses deep learning to identify plant diseases from images, providing farmers with instant diagnosis and treatment recommendations.
+> A full-stack web application that uses deep learning to identify plant diseases from images, providing farmers with instant diagnosis, treatment recommendations, and an AI chat assistant.
 
-**Technologies:** Python 3.11 | FastAPI 0.104 | React 18.2 | PyTorch 2.1
+**Technologies:** Python 3.11 | FastAPI | React 18 | PyTorch | Google Gemini | SQLite
 
 ---
 
 ## Overview
 
-AgroSight is a production-ready web application that leverages artificial intelligence and computer vision to detect plant diseases. The system allows users to upload plant images and receive real-time disease predictions with confidence scores and treatment recommendations.
+AgroSight is a production-ready web application that leverages AI and computer vision to detect plant diseases. Users upload plant images and receive real-time disease predictions with confidence scores, treatment recommendations, and AI-generated explanations. A built-in chat assistant powered by Google Gemini provides ongoing agricultural advice.
 
 ### Key Features
 
-- Image-based plant disease detection using ResNet CNN
-- User authentication and authorization with JWT
-- Real-time AI chat assistant for agricultural advice
-- Historical scan tracking and analytics dashboard
-- RESTful API with comprehensive documentation
-- Responsive web interface built with React
+- Image-based plant disease detection using a trained ResNet CNN
+- Google Gemini AI for disease explanations and chat assistance
+- User authentication with JWT and OTP-verified password changes
+- Scan history saved per user with delete support
+- Chat history persisted to database per user
+- Analytics dashboard with scan statistics
+- Responsive UI with mobile bottom nav and desktop sidebar
 
 ---
 
@@ -25,37 +26,32 @@ AgroSight is a production-ready web application that leverages artificial intell
 
 ```mermaid
 graph TB
-    subgraph "Frontend Layer"
-        A[User Interface] --> B[Authentication]
-        A --> C[Image Upload]
-        A --> D[Dashboard]
-        A --> E[Chat Interface]
+    subgraph "Frontend (React + Vite)"
+        A[Landing Page] --> B[Auth Pages]
+        B --> C[Dashboard]
+        C --> D[Scan Page]
+        C --> E[Chat Page]
+        C --> F[History Page]
+        C --> G[Profile Page]
     end
-    
-    subgraph "Backend Layer"
-        F[FastAPI Server] --> G[JWT Auth Service]
-        F --> H[Image Processing]
-        F --> I[SQLite Database]
-        F --> J[AI Model Service]
+
+    subgraph "Backend (FastAPI)"
+        H[Auth Routes] --> I[JWT + OTP]
+        J[Scan Routes] --> K[AI Model Service]
+        L[Chat Routes] --> M[Gemini Service]
+        N[Dashboard Routes] --> O[SQLite DB]
     end
-    
+
     subgraph "ML Layer"
-        K[ResNet Model] --> L[Disease Classification]
-        M[Training Pipeline] --> K
+        P[ResNet Model] --> Q[Disease Classification]
     end
-    
-    subgraph "External Services"
-        N[Google Gemini API]
-        O[Cerebras API]
-    end
-    
-    C --> F
-    B --> G
-    D --> I
-    E --> N
-    E --> O
-    H --> J
-    J --> K
+
+    D --> J
+    E --> L
+    K --> P
+    I --> O
+    J --> O
+    L --> O
 ```
 
 ---
@@ -67,17 +63,19 @@ sequenceDiagram
     participant User
     participant Frontend
     participant Backend
-    participant AI Model
+    participant ResNet
+    participant Gemini
     participant Database
-    
+
     User->>Frontend: Upload plant image
-    Frontend->>Backend: POST /api/scan
-    Backend->>AI Model: Process image
-    AI Model->>AI Model: Run inference
-    AI Model->>Backend: Return prediction
-    Backend->>Database: Store scan result
-    Backend->>Frontend: Return diagnosis
-    Frontend->>User: Display results
+    Frontend->>Backend: POST /api/scan/upload
+    Backend->>ResNet: Run inference
+    ResNet->>Backend: Disease + confidence
+    Backend->>Gemini: Generate explanation
+    Gemini->>Backend: AI explanation text
+    Backend->>Database: Save scan (if logged in)
+    Backend->>Frontend: Full result
+    Frontend->>User: Display diagnosis + chat
 ```
 
 ---
@@ -85,28 +83,29 @@ sequenceDiagram
 ## Technology Stack
 
 ### Frontend
-- **React 18.2** - Component-based UI library
-- **Vite** - Build tool and development server
-- **Axios** - HTTP client for API communication
-- **React Router** - Client-side routing
-- **Context API** - State management
+- **React 18** — Component-based UI
+- **Vite** — Build tool and dev server
+- **Tailwind CSS v3** — Utility-first styling
+- **React Router v6** — Client-side routing
+- **Axios** — HTTP client
+- **Context API** — Auth state management
 
 ### Backend
-- **FastAPI** - Modern Python web framework
-- **SQLAlchemy** - SQL toolkit and ORM
-- **Alembic** - Database migration tool
-- **Pydantic** - Data validation using Python type hints
-- **Passlib & JWT** - Authentication and security
+- **FastAPI** — Python web framework
+- **SQLAlchemy (async)** — ORM
+- **Alembic** — Database migrations
+- **Pydantic** — Data validation
+- **PyJWT + Passlib** — Auth and security
+- **Google Gemini API** — AI chat and explanations
 
 ### Machine Learning
-- **PyTorch** - Deep learning framework
-- **Torchvision** - Computer vision library
-- **ResNet** - Convolutional neural network architecture
-- **PIL/Pillow** - Image processing
+- **PyTorch** — Deep learning framework
+- **Torchvision / ResNet** — CNN architecture
+- **Pillow** — Image preprocessing
 
 ### Database
-- **SQLite** - Development database
-- **PostgreSQL** - Production database (Docker)
+- **SQLite** — Development (file-based)
+- **PostgreSQL** — Production (Docker)
 
 ---
 
@@ -118,43 +117,38 @@ agrosight/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── deps.py
+│   │   │   ├── deps.py                  # Auth dependency injection
 │   │   │   └── routes/
-│   │   │       ├── auth.py          # Authentication endpoints
-│   │   │       ├── scan.py          # Disease detection endpoints
-│   │   │       ├── chat.py          # Chat assistant endpoints
-│   │   │       └── dashboard.py     # Analytics endpoints
+│   │   │       ├── auth.py              # Register, login, OTP, profile
+│   │   │       ├── scan.py              # Upload, history, delete
+│   │   │       ├── chat.py              # Ask, history, clear
+│   │   │       └── dashboard.py         # Stats
 │   │   ├── core/
-│   │   │   ├── config.py            # Application configuration
-│   │   │   └── security.py          # Security utilities
+│   │   │   ├── config.py                # App settings
+│   │   │   └── security.py              # JWT utilities
 │   │   ├── models/
-│   │   │   ├── user.py              # User database model
-│   │   │   ├── scan.py              # Scan database model
-│   │   │   └── chat.py              # Chat database model
+│   │   │   ├── user.py
+│   │   │   ├── scan.py
+│   │   │   └── chat.py
 │   │   ├── schemas/
-│   │   │   ├── user.py              # User Pydantic schemas
-│   │   │   ├── scan.py              # Scan Pydantic schemas
-│   │   │   └── chat.py              # Chat Pydantic schemas
+│   │   │   ├── user.py
+│   │   │   ├── scan.py
+│   │   │   └── chat.py
 │   │   ├── services/
-│   │   │   ├── ai_model.py          # ML inference service
-│   │   │   ├── chat_service.py      # Chat integration service
-│   │   │   └── storage_service.py   # File storage service
+│   │   │   ├── ai_model.py              # ResNet inference
+│   │   │   ├── chat_service.py          # Gemini integration
+│   │   │   ├── disease_info.py          # Treatment data
+│   │   │   └── email_service.py         # OTP email
 │   │   └── db/
-│   │       ├── base.py              # Database base configuration
-│   │       ├── session.py           # Database session management
-│   │       └── migrations/          # Alembic migrations
+│   │       ├── base.py
+│   │       ├── session.py
+│   │       └── migrations/
 │   │
 │   ├── ml/
-│   │   ├── models/
-│   │   │   └── resnet_model.py      # ResNet architecture
-│   │   ├── training/
-│   │   │   ├── train.py             # Training script
-│   │   │   └── evaluate.py          # Evaluation script
-│   │   ├── utils/
-│   │   │   ├── preprocessing.py     # Data preprocessing
-│   │   │   └── augmentations.py     # Data augmentation
-│   │   ├── data/                    # Training datasets
-│   │   └── saved_models/            # Trained model files
+│   │   ├── training/train.py
+│   │   ├── utils/preprocessing.py
+│   │   ├── data/
+│   │   └── saved_models/
 │   │
 │   ├── requirements.txt
 │   ├── alembic.ini
@@ -163,30 +157,31 @@ agrosight/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Login.jsx
-│   │   │   ├── Signup.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── Scan.jsx
-│   │   │   ├── History.jsx
-│   │   │   └── Chat.jsx
+│   │   │   ├── LandingPage.jsx
+│   │   │   ├── LoginPage.jsx
+│   │   │   ├── RegisterPage.jsx
+│   │   │   ├── DashboardPage.jsx
+│   │   │   ├── ScanPage.jsx
+│   │   │   ├── ScanResultsPage.jsx
+│   │   │   ├── HistoryPage.jsx
+│   │   │   ├── ChatPage.jsx
+│   │   │   └── ProfilePage.jsx
 │   │   ├── components/
-│   │   │   ├── Navbar.jsx
-│   │   │   ├── Sidebar.jsx
-│   │   │   ├── UploadCard.jsx
-│   │   │   └── PrivateRoute.jsx
+│   │   │   ├── SideNavBar.jsx
+│   │   │   ├── BottomNavBar.jsx
+│   │   │   ├── TopAppBar.jsx
+│   │   │   └── ProtectedRoute.jsx
 │   │   ├── services/
-│   │   │   └── api.js               # API client
-│   │   ├── context/
-│   │   │   └── AuthContext.jsx      # Authentication context
-│   │   └── main.jsx
+│   │   │   └── api.js
+│   │   └── context/
+│   │       └── AuthContext.jsx
 │   │
 │   ├── package.json
 │   └── vite.config.js
 │
 ├── docker-compose.yml
 ├── .gitignore
-├── README.md
-└── SETUP.md
+└── README.md
 ```
 
 ---
@@ -195,139 +190,60 @@ agrosight/
 
 ### Prerequisites
 
-- Python 3.11 or higher
-- Node.js 18 or higher
+- Python 3.11+
+- Node.js 18+
 - Git
 
 ### Backend Setup
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/chandu1234678/AgroSight.git
-cd AgroSight
-```
+cd AgroSight/backend
 
-2. Navigate to backend directory:
-```bash
-cd backend
-```
-
-3. Create and activate virtual environment:
-```bash
-# Windows
 python -m venv venv
+# Windows
 .\venv\Scripts\activate
-
 # macOS/Linux
-python3 -m venv venv
 source venv/bin/activate
-```
 
-4. Install dependencies:
-```bash
 pip install -r requirements.txt
-```
-
-5. Run database migrations:
-```bash
 alembic upgrade head
-```
-
-6. Start the backend server:
-```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The backend API will be available at `http://localhost:8000`  
-API documentation: `http://localhost:8000/docs`
+API available at `http://localhost:8000` — docs at `http://localhost:8000/docs`
 
 ### Frontend Setup
 
-1. Open a new terminal and navigate to frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Start the development server:
-```bash
 npm run dev
 ```
 
-The frontend application will be available at `http://localhost:5173`
+App available at `http://localhost:5173`
 
 ---
 
-## Machine Learning Pipeline
+## Environment Variables
 
-### Model Architecture
-
-```mermaid
-graph LR
-    A[Input Image] --> B[Preprocessing]
-    B --> C[Resize 224x224]
-    C --> D[Normalization]
-    D --> E[ResNet Backbone]
-    E --> F[Feature Extraction]
-    F --> G[Classification Head]
-    G --> H[Disease Prediction]
-    H --> I[Confidence Score]
-```
-
-### Training Pipeline
-
-```mermaid
-graph TD
-    A[PlantVillage Dataset] --> B[Data Augmentation]
-    B --> C[Transformations]
-    C --> D[Pretrained ResNet34]
-    D --> E[Transfer Learning]
-    E --> F[Fine-tuning]
-    F --> G[Model Evaluation]
-    G --> H{Accuracy Check}
-    H -->|Pass| I[Save Model]
-    H -->|Fail| F
-    I --> J[Production Deployment]
-```
-
-### Data Augmentation Techniques
-
-- Random rotation (±15 degrees)
-- Horizontal and vertical flips
-- Random brightness and contrast adjustment
-- Gaussian noise injection
-- Motion blur simulation
-- Random cropping and scaling
-
----
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file in the `backend/` directory:
+Create `backend/.env`:
 
 ```env
-# Database Configuration
 DATABASE_URL=sqlite:///./agrosight.db
 
-# Security
 SECRET_KEY=your-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# External APIs (Optional)
 GEMINI_API_KEY=your-gemini-api-key
-CEREBRAS_API_KEY=your-cerebras-api-key
 
-# Storage (Optional)
-CLOUDINARY_URL=your-cloudinary-url
+# Email (for OTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@email.com
+SMTP_PASSWORD=your-app-password
 
-# ML Model Configuration
 MODEL_PATH=ml/saved_models/resnet_plant_disease.pth
 CLASS_NAMES_PATH=ml/saved_models/class_names.json
 ```
@@ -337,127 +253,71 @@ CLASS_NAMES_PATH=ml/saved_models/class_names.json
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/signup` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Get JWT token |
+| GET | `/api/auth/me` | Current user info |
+| PUT | `/api/auth/me` | Update profile |
+| DELETE | `/api/auth/me` | Delete account |
+| POST | `/api/auth/send-change-otp` | Send OTP for password change |
+| POST | `/api/auth/verify-change-otp` | Verify OTP, get change token |
+| POST | `/api/auth/forgot-password` | Request reset OTP |
+| POST | `/api/auth/reset-password` | Reset with token |
 
-### Disease Detection
-- `POST /api/scan` - Upload image for disease detection
-- `GET /api/scan/{scan_id}` - Get scan details
-- `GET /api/scan/history` - Get user scan history
+### Scan
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/scan/upload` | Upload image, get diagnosis |
+| GET | `/api/scan/history` | User scan history |
+| GET | `/api/scan/{id}` | Single scan details |
+| DELETE | `/api/scan/{id}` | Delete scan |
+
+### Chat
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/chat/ask` | Ask AI assistant |
+| GET | `/api/chat/history` | Chat history |
+| DELETE | `/api/chat/history` | Clear all history |
 
 ### Dashboard
-- `GET /api/dashboard/stats` - Get user statistics
-
-### Chat Assistant
-- `POST /api/chat` - Send message to AI assistant
-- `GET /api/chat/history` - Get chat history
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/stats` | User statistics |
 
 ---
 
 ## Docker Deployment
 
-Run the entire application stack using Docker Compose:
-
 ```bash
 docker-compose up --build
 ```
 
-This will start:
-- Backend API (port 8000)
-- Frontend application (port 5173)
-- PostgreSQL database (port 5432)
-
----
-
-## Testing
-
-### Backend Tests
-```bash
-cd backend
-pytest
-```
-
-### Frontend Tests
-```bash
-cd frontend
-npm test
-```
-
----
-
-## Technical Concepts
-
-### Transfer Learning
-The application uses transfer learning by leveraging a pre-trained ResNet model trained on ImageNet. The final classification layer is replaced and fine-tuned on plant disease datasets, significantly reducing training time and improving accuracy.
-
-### JWT Authentication
-JSON Web Tokens (JWT) are used for stateless authentication. Upon successful login, users receive a token that must be included in subsequent API requests via the Authorization header.
-
-### REST API Design
-The backend follows RESTful principles with proper HTTP methods (GET, POST, PUT, DELETE), status codes, and resource-based URLs for intuitive API interaction.
+Starts backend (8000), frontend (5173), and PostgreSQL (5432).
 
 ---
 
 ## Troubleshooting
 
-### Backend Issues
-
-**Port already in use:**
+**Port 8000 in use:**
 ```bash
-# Find and kill process on port 8000
 # Windows
 netstat -ano | findstr :8000
 taskkill /PID <PID> /F
-
-# macOS/Linux
-lsof -ti:8000 | xargs kill -9
 ```
 
-**Database migration errors:**
+**Database errors:**
 ```bash
-# Reset database
-rm agrosight.db
-alembic upgrade head
+rm backend/agrosight.db
+cd backend && alembic upgrade head
 ```
 
-### Frontend Issues
-
-**Module not found errors:**
+**Frontend module errors:**
 ```bash
-# Clear cache and reinstall
+cd frontend
 rm -rf node_modules package-lock.json
 npm install
 ```
-
-**Build errors:**
-```bash
-# Clear Vite cache
-rm -rf node_modules/.vite
-npm run dev
-```
-
----
-
-## Contributing
-
-Contributions are welcome. Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-feature`)
-3. Commit your changes (`git commit -m 'Add new feature'`)
-4. Push to the branch (`git push origin feature/new-feature`)
-5. Open a Pull Request
-
----
-
-## Learning Resources
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [React Documentation](https://react.dev/)
-- [PyTorch Tutorials](https://pytorch.org/tutorials/)
-- [Transfer Learning Guide](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html)
-- [PlantVillage Dataset](https://www.kaggle.com/datasets/emmarex/plantdisease)
 
 ---
 
@@ -465,5 +325,5 @@ Contributions are welcome. Please follow these steps:
 
 - PlantVillage dataset for training data
 - PyTorch team for the deep learning framework
-- FastAPI community for the excellent web framework
-
+- Google Gemini for AI capabilities
+- FastAPI community

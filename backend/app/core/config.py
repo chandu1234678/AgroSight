@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     CEREBRAS_API_KEY: Optional[str] = None
     
+    # Brevo Email API (formerly Sendinblue)
+    BREVO_API_KEY: Optional[str] = None
+    BREVO_SENDER_EMAIL: str = "factcheckai2@gmail.com"
+    
     STORAGE_TYPE: str = "local"
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 10485760

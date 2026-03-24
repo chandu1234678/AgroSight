@@ -1,56 +1,39 @@
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg-info/
 .Python
 venv/
 env/
 ENV/
-*.egg-info/
 .pytest_cache/
 
-# Database
+# ── Environment ───────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# ── Database ──────────────────────────────────────────────────────────────────
 *.db
 *.sqlite3
 *.db-journal
 
-# Environment
-.env
-.env.local
-.env.production
-
-# Node
+# ── Node / Frontend ───────────────────────────────────────────────────────────
 node_modules/
 dist/
 build/
 .vite/
+*.local
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Docker
-docker-compose.override.yml
-
-# Uploads
-uploads/
-backend/uploads/*
-!backend/uploads/.gitkeep
-
-# ML Data and Models - Exclude ALL dataset files
-backend/ml/data/
-!backend/ml/data/.gitkeep
+# ── ML Data & Models ──────────────────────────────────────────────────────────
+backend/ml/data/raw/
+backend/ml/data/processed/
+!backend/ml/data/processed/.gitkeep
+!backend/ml/data/processed/class_names.json
 backend/ml/saved_models/*.pth
 backend/ml/saved_models/*.pt
 backend/ml/saved_models/*.onnx
@@ -59,7 +42,26 @@ backend/ml/saved_models/*.tflite
 !backend/ml/saved_models/.gitkeep
 !backend/ml/saved_models/class_names.json
 
-# Temporary files
+# ── Uploads ───────────────────────────────────────────────────────────────────
+uploads/
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
 *.tmp
 *.temp
 .cache/
+stitch_build/
+docker-compose.override.yml

@@ -1,57 +1,58 @@
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyc
+*.egg-info/
 .Python
 venv/
 env/
 ENV/
-*.egg-info/
 .pytest_cache/
-*.pyc
 
-# Database
+# ── Environment ───────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+
+# ── Database ──────────────────────────────────────────────────────────────────
 *.db
 *.sqlite3
 *.db-journal
 agrosight.db
 
-# Environment
-.env
-.env.local
-.env.production
-
-# ML Models & Data - Exclude ALL
-ml/data/
-!ml/data/.gitkeep
+# ── ML Models & Data ──────────────────────────────────────────────────────────
+ml/data/raw/
+ml/data/processed/
+!ml/data/processed/.gitkeep
+!ml/data/processed/class_names.json
 ml/saved_models/*.pth
-ml/saved_models/*.onnx
 ml/saved_models/*.pt
+ml/saved_models/*.onnx
 ml/saved_models/*.h5
 ml/saved_models/*.tflite
 !ml/saved_models/.gitkeep
 !ml/saved_models/class_names.json
 
-# Logs
-*.log
-logs/
-
-# Uploads
+# ── Uploads ───────────────────────────────────────────────────────────────────
 uploads/*
 !uploads/.gitkeep
 
-# IDE
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Temporary
+# ── Misc ──────────────────────────────────────────────────────────────────────
 *.tmp
 *.temp
 .cache/
