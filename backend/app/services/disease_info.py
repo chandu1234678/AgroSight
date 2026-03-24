@@ -284,3 +284,36 @@ def get_diseases_by_crop(crop_type: str) -> List[Dict]:
         d for d in DISEASES_DATABASE.values()
         if d["crop_type"].lower() == crop_type.lower()
     ]
+
+
+class DiseaseInfoService:
+    """Service class for disease information lookup."""
+    
+    @staticmethod
+    def get_disease_info(disease_name: str, language: str = "en") -> Dict:
+        """
+        Get disease information by name.
+        Returns default info if disease not found.
+        """
+        # Try to find disease in database
+        disease = get_disease_by_name(disease_name, language)
+        
+        if disease:
+            return disease
+        
+        # Return default info if not found
+        return {
+            "name": disease_name,
+            "crop_type": "Unknown",
+            "severity_level": "medium",
+            "cause": "Disease information not available",
+            "organic_treatment": "Apply neem oil spray and remove infected parts",
+            "chemical_treatment": "Consult local agricultural expert for appropriate fungicide",
+            "prevention": [
+                "Maintain proper plant spacing",
+                "Ensure good air circulation",
+                "Water at base of plant",
+                "Remove infected leaves promptly",
+                "Use disease-resistant varieties"
+            ]
+        }

@@ -12,7 +12,7 @@ from app.services.storage_service import StorageService
 
 router = APIRouter()
 
-@router.post("/upload", response_model=PredictionResponse)
+@router.post("/upload")
 async def upload_scan(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -24,16 +24,23 @@ async def upload_scan(
         raise HTTPException(status_code=400, detail="File must be an image")
     
     # TODO: Upload image to storage (Cloudinary/S3)
-    image_url = await StorageService.upload_image(file)
+    # For now, use placeholder URL
+    image_url = f"https://placeholder.com/scan_{current_user.id}.jpg"
     
     # TODO: Run AI model inference
     prediction = await AIModelService.predict(file)
     
-    # TODO: Calculate severity based on confidence and disease type
-    severity = "moderate"  # Placeholder
+    # Get disease info from service
+    from app.services.disease_info import DiseaseInfoService
+    disease_info = DiseaseInfoService.get_disease_info(prediction["disease"])
     
-    # TODO: Generate recommendation based on disease
-    recommendation = "Apply appropriate fungicide. Consult local agricultural expert."  # Placeholder
+    # Calculate severity based on confidence
+    if prediction["confidence"] > 0.85:
+        severity = "high"
+    elif prediction["confidence"] > 0.70:
+        severity = "moderate"
+    else:
+        severity = "low"
     
     # Save scan to database
     scan = Scan(
@@ -42,15 +49,33 @@ async def upload_scan(
         disease=prediction["disease"],
         confidence=prediction["confidence"],
         severity=severity,
-        recommendation=recommendation
+        recommendation=disease_info.get("organic_treatment", "Consult agricultural expert")
     )
     db.add(scan)
     await db.commit()
     await db.refresh(scan)
     
-    return scan
+    # Return formatted response for frontend
+    return {
+        "id": scan.id,
+        "disease": scan.disease,
+        "confidence": scan.confidence,
+        "severity_level": severity,
+        "solution": {
+            "organic": disease_info.get("organic_treatment", "Apply neem oil spray"),
+            "chemical": disease_info.get("chemical_treatment", "Apply appropriate fungicide")
+        },
+        "prevention": disease_info.get("prevention", [
+            "Ensure proper plant spacing",
+            "Water at base of plant",
+            "Remove infected leaves",
+            "Apply preventive treatments"
+        ]),
+        "image_url": image_url,
+        "created_at": scan.created_at
+    }
 
-@router.get("/history", response_model=List[PredictionResponse])
+@router.get("/history")
 async def get_scan_history(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -66,9 +91,18 @@ async def get_scan_history(
         .limit(limit)
     )
     scans = result.scalars().all()
-    return scans
+    
+    # Convert to dict format for frontend
+    return [{
+        "id": scan.id,
+        "disease": scan.disease,
+        "confidence": scan.confidence,
+        "severity": scan.severity,
+        "image_url": scan.image_url,
+        "created_at": scan.created_at.isoformat() if scan.created_at else None
+    } for scan in scans]
 
-@router.get("/{scan_id}", response_model=PredictionResponse)
+@router.get("/{scan_id}")
 async def get_scan(
     scan_id: int,
     current_user: User = Depends(get_current_user),
@@ -84,4 +118,13 @@ async def get_scan(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     
-    return scan
+    # Return formatted response
+    return {
+        "id": scan.id,
+        "disease": scan.disease,
+        "confidence": scan.confidence,
+        "severity": scan.severity,
+        "recommendation": scan.recommendation,
+        "image_url": scan.image_url,
+        "created_at": scan.created_at.isoformat() if scan.created_at else None
+    }

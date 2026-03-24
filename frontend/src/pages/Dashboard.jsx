@@ -14,6 +14,7 @@ const Dashboard = () => {
     mostCommonDisease: 'N/A'
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     fetchDashboardData()
@@ -22,9 +23,18 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       const response = await api.get('/dashboard/stats')
-      setStats(response.data)
+      const data = response.data
+      
+      // Map API response to component state
+      setStats({
+        totalScans: data.total_scans || 0,
+        mostCommonDisease: data.most_common_disease || 'N/A',
+        recentScans: data.recent_scans || []
+      })
+      setError(null)
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
+      setError('Unable to load dashboard data')
     } finally {
       setLoading(false)
     }
@@ -37,15 +47,27 @@ const Dashboard = () => {
         <Sidebar />
         <main style={styles.main}>
           <div style={styles.header}>
-            <h1>🌾 Dashboard</h1>
-            <p>Welcome back! Here's your plant health overview.</p>
+            <div>
+              <h1>🌾 Dashboard</h1>
+              <p>Welcome back! Here's your plant health overview.</p>
+            </div>
+            <button onClick={() => navigate('/scan')} style={styles.quickScanButton}>
+              📸 Quick Scan
+            </button>
           </div>
+
+          {error && (
+            <div style={styles.errorBanner}>
+              <span>⚠️ {error}</span>
+              <button onClick={fetchDashboardData} style={styles.retryButton}>Retry</button>
+            </div>
+          )}
 
           <div style={styles.statsGrid}>
             <div style={styles.statCard}>
               <div style={styles.statIcon}>📊</div>
               <div>
-                <h3>{stats.totalScans}</h3>
+                <h3>{loading ? '...' : stats.totalScans}</h3>
                 <p>Total Scans</p>
               </div>
             </div>
@@ -53,7 +75,7 @@ const Dashboard = () => {
             <div style={styles.statCard}>
               <div style={styles.statIcon}>🦠</div>
               <div>
-                <h3>{stats.mostCommonDisease}</h3>
+                <h3>{loading ? '...' : stats.mostCommonDisease}</h3>
                 <p>Most Common Disease</p>
               </div>
             </div>
@@ -61,7 +83,7 @@ const Dashboard = () => {
             <div style={styles.statCard}>
               <div style={styles.statIcon}>✅</div>
               <div>
-                <h3>{stats.recentScans.length}</h3>
+                <h3>{loading ? '...' : stats.recentScans.length}</h3>
                 <p>Recent Scans</p>
               </div>
             </div>
@@ -89,27 +111,41 @@ const Dashboard = () => {
           </div>
 
           {loading ? (
-            <p>Loading recent scans...</p>
-          ) : stats.recentScans.length > 0 ? (
+            <div style={styles.loadingState}>
+              <div style={styles.spinner}></div>
+              <p>Loading recent scans...</p>
+            </div>
+          ) : stats.recentScans && stats.recentScans.length > 0 ? (
             <div style={styles.recentScans}>
               <h2>Recent Scans</h2>
               <div style={styles.scansList}>
                 {stats.recentScans.map((scan, index) => (
-                  <div key={index} style={styles.scanCard}>
+                  <div key={scan.id || index} style={styles.scanCard}>
                     <div style={styles.scanInfo}>
                       <strong>{scan.disease || 'Unknown'}</strong>
                       <span style={styles.confidence}>
                         {scan.confidence ? `${(scan.confidence * 100).toFixed(1)}%` : 'N/A'}
                       </span>
                     </div>
-                    <small>{new Date(scan.created_at).toLocaleDateString()}</small>
+                    <small>
+                      {scan.created_at 
+                        ? new Date(scan.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })
+                        : 'N/A'
+                      }
+                    </small>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
             <div style={styles.emptyState}>
-              <p>No scans yet. Start by scanning your first plant!</p>
+              <div style={styles.emptyIcon}>🌱</div>
+              <h3>No scans yet</h3>
+              <p>Start by scanning your first plant to detect diseases</p>
               <button 
                 style={styles.primaryButton}
                 onClick={() => navigate('/scan')}
@@ -127,8 +163,43 @@ const Dashboard = () => {
 const styles = {
   container: { minHeight: '100vh', background: '#f5f5f5' },
   content: { display: 'flex' },
-  main: { flex: 1, padding: '2rem', marginLeft: '250px', marginTop: '60px' },
-  header: { marginBottom: '2rem' },
+  main: { flex: 1, padding: '2rem', marginLeft: '250px', marginTop: '60px', maxWidth: '1400px' },
+  header: { 
+    marginBottom: '2rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '1rem'
+  },
+  quickScanButton: {
+    padding: '0.75rem 1.5rem',
+    background: '#2d5016',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: '500'
+  },
+  errorBanner: {
+    padding: '1rem',
+    background: '#ffebee',
+    color: '#c62828',
+    borderRadius: '6px',
+    marginBottom: '1.5rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  retryButton: {
+    padding: '0.5rem 1rem',
+    background: '#c62828',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer'
+  },
   statsGrid: { 
     display: 'grid', 
     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
@@ -142,9 +213,11 @@ const styles = {
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     display: 'flex',
     alignItems: 'center',
-    gap: '1rem'
+    gap: '1rem',
+    transition: 'transform 0.2s',
+    cursor: 'pointer'
   },
-  statIcon: { fontSize: '2rem' },
+  statIcon: { fontSize: '2.5rem' },
   actions: { display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' },
   primaryButton: { 
     padding: '0.75rem 1.5rem', 
@@ -154,7 +227,8 @@ const styles = {
     borderRadius: '6px', 
     cursor: 'pointer',
     fontSize: '1rem',
-    fontWeight: '500'
+    fontWeight: '500',
+    transition: 'background 0.2s'
   },
   secondaryButton: { 
     padding: '0.75rem 1.5rem', 
@@ -164,9 +238,31 @@ const styles = {
     borderRadius: '6px', 
     cursor: 'pointer',
     fontSize: '1rem',
-    fontWeight: '500'
+    fontWeight: '500',
+    transition: 'all 0.2s'
   },
-  recentScans: { background: 'white', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
+  loadingState: {
+    textAlign: 'center',
+    padding: '3rem',
+    background: 'white',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+  },
+  spinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #2d5016',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    margin: '0 auto 1rem'
+  },
+  recentScans: { 
+    background: 'white', 
+    padding: '1.5rem', 
+    borderRadius: '8px', 
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
+  },
   scansList: { display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' },
   scanCard: { 
     padding: '1rem', 
@@ -174,7 +270,9 @@ const styles = {
     borderRadius: '6px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    transition: 'transform 0.2s',
+    cursor: 'pointer'
   },
   scanInfo: { display: 'flex', gap: '1rem', alignItems: 'center' },
   confidence: { 
@@ -187,10 +285,14 @@ const styles = {
   },
   emptyState: { 
     textAlign: 'center', 
-    padding: '3rem', 
+    padding: '4rem 2rem', 
     background: 'white', 
     borderRadius: '8px',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+  },
+  emptyIcon: {
+    fontSize: '4rem',
+    marginBottom: '1rem'
   }
 }
 

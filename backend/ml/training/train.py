@@ -19,15 +19,51 @@ from ml.models.resnet_model import create_model
 def get_data_loaders(data_dir: str, batch_size: int = 32):
     """Create data loaders for training and validation."""
     
-    # Data transforms with augmentation for training
+    # ENHANCED PRODUCTION-LEVEL DATA AUGMENTATION
+    # Includes all best practices for plant disease detection
     train_transform = transforms.Compose([
+        # Resize and smart cropping
         transforms.Resize(256),
-        transforms.RandomCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.RandomRotation(15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),  # Better than RandomCrop
+        
+        # Geometric augmentations
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomVerticalFlip(p=0.5),
+        transforms.RandomRotation(degrees=30),  # Increased from 15 to 30
+        transforms.RandomAffine(
+            degrees=0,
+            translate=(0.1, 0.1),  # Handles different positions
+            scale=(0.9, 1.1),      # Handles different zoom levels
+            shear=10               # Handles different angles
+        ),
+        
+        # Color augmentations (stronger for robustness)
+        transforms.ColorJitter(
+            brightness=0.3,  # Increased from 0.2
+            contrast=0.3,    # Increased from 0.2
+            saturation=0.3,  # Increased from 0.2
+            hue=0.1          # Added - handles color variations
+        ),
+        
+        # Advanced augmentations
+        transforms.RandomApply([
+            transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))
+        ], p=0.3),  # Simulates blurry photos (30% chance)
+        
+        transforms.RandomGrayscale(p=0.1),  # Simulates poor lighting (10% chance)
+        
+        # Convert to tensor
         transforms.ToTensor(),
+        
+        # Random erasing (simulates occlusion/shadows)
+        transforms.RandomErasing(
+            p=0.3,
+            scale=(0.02, 0.15),
+            ratio=(0.3, 3.3),
+            value='random'
+        ),
+        
+        # Normalization (ImageNet standard)
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     
@@ -228,25 +264,50 @@ def train_model(
     print("="*60 + "\n")
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Train plant disease detection model')
+    parser.add_argument('--data', type=str, default='auto', 
+                       help='Dataset to use: auto, structured, plantvillage, plantdoc, plant-leaf')
+    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
+    parser.add_argument('--batch-size', type=int, default=32, help='Batch size')
+    parser.add_argument('--device', type=str, default='auto', help='Device: auto, cuda, cpu')
+    args = parser.parse_args()
+    
     # Get absolute paths
     script_dir = Path(__file__).parent.absolute()
     ml_dir = script_dir.parent
     raw_dir = ml_dir / "data" / "raw"
+    structured_dir = ml_dir / "data" / "structured"
     
-    # Try to find available datasets in order of preference
-    possible_datasets = [
-        raw_dir / "plant-leaf-disease" / "dataset",
-        raw_dir / "plant-leaf-disease" / "train",
-        raw_dir / "New Plant Diseases Dataset(Augmented)" / "New Plant Diseases Dataset(Augmented)" / "train",
-        raw_dir / "plantvillage" / "raw" / "color",
-        raw_dir / "plantvillage" / "data_distribution_for_SVM" / "train",
-    ]
-    
+    # Select dataset based on argument
     data_dir = None
-    for dataset_path in possible_datasets:
-        if dataset_path.exists():
-            data_dir = dataset_path
-            break
+    
+    if args.data == "structured":
+        # Use structured dataset (recommended)
+        if (structured_dir / "train").exists():
+            data_dir = structured_dir / "train"
+            print(f"Using structured dataset: {data_dir}")
+        else:
+            print("✗ Structured dataset not found!")
+            print("Run: python datasets/structure_datasets.py")
+            sys.exit(1)
+    else:
+        # Try to find available datasets in order of preference
+        possible_datasets = [
+            ("Structured (All Combined)", structured_dir / "train"),
+            ("Plant-Leaf-Disease", raw_dir / "plant-leaf-disease" / "dataset"),
+            ("PlantVillage (Augmented)", raw_dir / "New Plant Diseases Dataset(Augmented)" / "New Plant Diseases Dataset(Augmented)" / "train"),
+            ("PlantVillage (Original)", raw_dir / "plantvillage" / "raw" / "color"),
+            ("PlantDoc", raw_dir / "plantdoc" / "train"),
+        ]
+        
+        for name, dataset_path in possible_datasets:
+            if dataset_path.exists():
+                data_dir = dataset_path
+                print(f"Using dataset: {name}")
+                print(f"Location: {data_dir}")
+                break
     
     if data_dir is None:
         print("Error: No suitable dataset found!")

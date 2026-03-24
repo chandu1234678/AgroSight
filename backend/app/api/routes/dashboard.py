@@ -9,7 +9,7 @@ from app.schemas.dashboard import DashboardStats
 
 router = APIRouter()
 
-@router.get("/stats", response_model=DashboardStats)
+@router.get("/stats")
 async def get_dashboard_stats(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -41,8 +41,16 @@ async def get_dashboard_stats(
     )
     recent_scans = recent_result.scalars().all()
     
+    # Format recent scans
+    formatted_scans = [{
+        "id": scan.id,
+        "disease": scan.disease,
+        "confidence": scan.confidence,
+        "created_at": scan.created_at.isoformat() if scan.created_at else None
+    } for scan in recent_scans]
+    
     return {
         "total_scans": total_scans,
         "most_common_disease": most_common_disease,
-        "recent_scans": recent_scans
+        "recent_scans": formatted_scans
     }

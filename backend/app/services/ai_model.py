@@ -63,7 +63,7 @@ class AIModelService:
         """Run inference on uploaded image."""
         cls.load_model()
         
-        # TODO: Implement actual prediction
+        # TODO: Implement actual prediction when model is trained
         # image = Image.open(image_file.file).convert('RGB')
         # image_tensor = cls.transform(image).unsqueeze(0).to(cls.device)
         
@@ -75,8 +75,21 @@ class AIModelService:
         # disease = cls.class_names[predicted.item()]
         # confidence_score = confidence.item()
         
-        # Placeholder response
+        # Placeholder response with realistic data
+        import random
+        diseases = [
+            "Tomato Late Blight",
+            "Tomato Early Blight", 
+            "Potato Late Blight",
+            "Apple Powdery Mildew",
+            "Grape Powdery Mildew",
+            "Rice Blast",
+            "Wheat Leaf Rust",
+            "Corn Common Rust",
+            "Pepper Bell Bacterial Spot"
+        ]
+        
         return {
-            "disease": "Early Blight",
-            "confidence": 0.92
+            "disease": random.choice(diseases),
+            "confidence": round(random.uniform(0.75, 0.98), 2)
         }

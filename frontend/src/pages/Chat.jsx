@@ -31,7 +31,10 @@ const Chat = () => {
     setLoading(true)
 
     try {
-      const response = await api.post('/chat', { message: input })
+      const response = await api.post('/chat/ask', { 
+        query: input,
+        use_detailed: false 
+      })
       const assistantMessage = { 
         role: 'assistant', 
         content: response.data.response || 'Sorry, I couldn\'t process that.' 

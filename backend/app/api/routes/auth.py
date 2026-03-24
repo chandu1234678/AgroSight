@@ -243,7 +243,7 @@ async def login(
         )
     
     # Create JWT token
-    access_token = create_access_token(data={"sub": user.id})
+    access_token = create_access_token(data={"sub": str(user.id)})  # Convert to string
     
     return Token(
         access_token=access_token,

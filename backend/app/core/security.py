@@ -130,8 +130,12 @@ def extract_user_id_from_token(token: str) -> Optional[int]:
         return None
     
     user_id = payload.get("sub")
-    if not user_id or not isinstance(user_id, int):
+    if not user_id:
         return None
     
-    return user_id
+    # Convert to int if it's a string
+    try:
+        return int(user_id)
+    except (ValueError, TypeError):
+        return None
 
