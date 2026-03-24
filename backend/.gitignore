@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+*.pyc
+
+# Database
+*.db
+*.sqlite3
+*.db-journal
+
+# Environment
+.env
+.env.local
+.env.production
+
+# ML Models & Data
+ml/data/raw/*
+ml/data/processed/*
+ml/saved_models/*.pth
+ml/saved_models/*.onnx
+ml/saved_models/*.pt
+!ml/saved_models/.gitkeep
+!ml/data/raw/.gitkeep
+!ml/data/processed/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
