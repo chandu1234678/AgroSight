@@ -43,6 +43,10 @@ async def upload_scan(
     raw_confidence = min(prediction["confidence"], 0.99)
     disease_info = DiseaseInfoService.get_disease_info(prediction["disease"])
 
+    gradcam_b64       = prediction.get("gradcam_b64")
+    affected_area_pct = prediction.get("affected_area_pct", 0.0)
+    spread_risk_pct   = prediction.get("spread_risk_pct", 0.0)
+
     if raw_confidence > 0.85:
         severity = "high"
     elif raw_confidence > 0.70:
@@ -110,6 +114,9 @@ async def upload_scan(
             "Apply preventive treatments",
         ]),
         "image_url": image_url,
+        "gradcam_url": f"data:image/jpeg;base64,{gradcam_b64}" if gradcam_b64 else None,
+        "affected_area_pct": affected_area_pct,
+        "spread_risk_pct": spread_risk_pct,
         "created_at": created_at.isoformat(),
         "saved": saved,
     }

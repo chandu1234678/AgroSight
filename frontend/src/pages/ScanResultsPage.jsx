@@ -291,6 +291,187 @@ const ScanResultsPage = () => {
             </div>
           </section>
 
+          {/* ── Visual Analysis — GradCAM + Area Stats ───────────────────── */}
+          {(result.gradcam_url || result.affected_area_pct > 0) && (
+            <section className="space-y-6">
+              <div className="flex items-center gap-6">
+                <h3 className="text-2xl font-bold font-headline tracking-tight text-on-surface whitespace-nowrap">
+                  Visual Analysis
+                </h3>
+                <div className="h-px flex-1 bg-outline-variant/20 hidden md:block" />
+                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold hidden md:block">
+                  GradCAM · Activation Heatmap
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Image comparison */}
+                <div className="bg-surface-container-low rounded-xl overflow-hidden">
+                  <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Original vs Heatmap</p>
+                    <span className="text-[10px] text-on-surface-variant/60">Jet colormap overlay</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-0">
+                    {/* Original */}
+                    <div className="relative">
+                      <div className="absolute top-2 left-2 z-10 px-2 py-0.5 bg-black/60 rounded text-[10px] text-white font-bold uppercase tracking-wider">
+                        Original
+                      </div>
+                      {result.image_url && !imgError ? (
+                        <img
+                          src={result.image_url}
+                          alt="Original scan"
+                          className="w-full h-48 object-cover"
+                          onError={() => setImgError(true)}
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-surface-container-highest flex items-center justify-center">
+                          <span className="material-symbols-outlined text-3xl text-on-surface-variant">image</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* GradCAM */}
+                    <div className="relative">
+                      <div className="absolute top-2 left-2 z-10 px-2 py-0.5 bg-black/60 rounded text-[10px] text-white font-bold uppercase tracking-wider">
+                        GradCAM
+                      </div>
+                      {result.gradcam_url ? (
+                        <img
+                          src={result.gradcam_url}
+                          alt="GradCAM heatmap"
+                          className="w-full h-48 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-surface-container-highest flex items-center justify-center">
+                          <span className="material-symbols-outlined text-3xl text-on-surface-variant">blur_on</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Colormap legend */}
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <span className="text-[10px] text-on-surface-variant">Low activation</span>
+                    <div className="flex-1 h-2 rounded-full" style={{
+                      background: 'linear-gradient(to right, #00007f, #0000ff, #00ffff, #00ff00, #ffff00, #ff7f00, #ff0000)'
+                    }} />
+                    <span className="text-[10px] text-on-surface-variant">High activation</span>
+                  </div>
+                </div>
+
+                {/* Area stats */}
+                <div className="space-y-4">
+                  {/* Affected area */}
+                  <div className="bg-surface-container-low rounded-xl p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-error text-lg">crisis_alert</span>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold">Affected Area</p>
+                          <p className="text-[10px] text-on-surface-variant/60">High-activation pixels</p>
+                        </div>
+                      </div>
+                      <span className={`text-3xl font-black tracking-tighter ${
+                        (result.affected_area_pct || 0) > 40 ? 'text-error' :
+                        (result.affected_area_pct || 0) > 20 ? 'text-secondary' : 'text-primary'
+                      }`}>
+                        {result.affected_area_pct ?? 0}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-surface-container-highest h-3 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          (result.affected_area_pct || 0) > 40 ? 'bg-error' :
+                          (result.affected_area_pct || 0) > 20 ? 'bg-secondary' : 'bg-primary'
+                        }`}
+                        style={{ width: `${Math.min(result.affected_area_pct || 0, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      {(result.affected_area_pct || 0) > 40
+                        ? 'Severe infection. Large portions of the leaf surface show active disease markers. Immediate treatment required.'
+                        : (result.affected_area_pct || 0) > 20
+                        ? 'Moderate infection. Disease is established and spreading. Treat within 48 hours.'
+                        : (result.affected_area_pct || 0) > 5
+                        ? 'Early-stage infection detected. Localised lesions visible. Early treatment will prevent spread.'
+                        : 'Minimal or no visible infection area. Plant appears healthy or in very early stage.'}
+                    </p>
+                  </div>
+
+                  {/* Spread risk */}
+                  <div className="bg-surface-container-low rounded-xl p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-secondary text-lg">trending_up</span>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold">Spread Risk</p>
+                          <p className="text-[10px] text-on-surface-variant/60">Advancing infection front</p>
+                        </div>
+                      </div>
+                      <span className={`text-3xl font-black tracking-tighter ${
+                        (result.spread_risk_pct || 0) > 25 ? 'text-error' :
+                        (result.spread_risk_pct || 0) > 12 ? 'text-secondary' : 'text-primary'
+                      }`}>
+                        {result.spread_risk_pct ?? 0}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-surface-container-highest h-3 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          (result.spread_risk_pct || 0) > 25 ? 'bg-error' :
+                          (result.spread_risk_pct || 0) > 12 ? 'bg-secondary' : 'bg-primary'
+                        }`}
+                        style={{ width: `${Math.min((result.spread_risk_pct || 0) * 2, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      {(result.spread_risk_pct || 0) > 25
+                        ? 'High spread risk. Active infection front detected across a wide area. Neighbouring plants are at risk.'
+                        : (result.spread_risk_pct || 0) > 12
+                        ? 'Moderate spread risk. Disease is advancing beyond the initial lesion zone. Isolate affected plants.'
+                        : 'Low spread risk. Infection appears contained. Monitor closely over the next 3–5 days.'}
+                    </p>
+                  </div>
+
+                  {/* Projection */}
+                  <div className="bg-surface-container-low rounded-xl p-6">
+                    <p className="text-xs uppercase tracking-widest text-on-surface-variant font-bold mb-4">7-Day Damage Projection</p>
+                    <div className="space-y-2">
+                      {(() => {
+                        const base = result.affected_area_pct || 0;
+                        const risk = result.spread_risk_pct || 0;
+                        const growthRate = isHealthy ? 0 : Math.min(risk * 0.8, 8);
+                        return [1, 3, 7].map((day) => {
+                          const projected = Math.min(base + growthRate * day, 95);
+                          return (
+                            <div key={day} className="flex items-center gap-3">
+                              <span className="text-[10px] text-on-surface-variant w-12 shrink-0">Day {day}</span>
+                              <div className="flex-1 bg-surface-container-highest h-2 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-primary to-error transition-all duration-700"
+                                  style={{ width: `${projected}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-on-surface-variant w-10 text-right shrink-0">
+                                {projected.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant/50 mt-3">
+                      Projection based on current spread rate. Treat immediately to halt progression.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* ── Intervention Strategy ─────────────────────────────────────── */}
           {!isHealthy && (
             <section className="space-y-8">
