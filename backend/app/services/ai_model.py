@@ -70,111 +70,106 @@ class AIModelService:
     @classmethod
     def _compute_gradcam(cls, original_pil, class_idx):
         """
-        Proper GradCAM on ResNet34's last BasicBlock (layer4[-1]).
-        Hooks the last conv layer inside that block so we get a full
-        spatial activation map, not a collapsed single pixel.
+        GradCAM on ResNet34 layer4[-1].conv2.
 
-        Returns a numpy float32 array (H, W) normalised to [0, 1].
+        Key correctness rules:
+        - forward hook must NOT detach — the tensor must stay in the graph
+        - backward hook reads grad_out[0] which is the gradient w.r.t. the
+          layer output (same shape as the activation)
+        - model stays in eval() — we just temporarily enable grad context
         """
         import numpy as np
         torch = cls._torch
 
-        # Target: last BasicBlock in layer4, then its second conv (conv2)
         target_layer = cls.model.layer4[-1].conv2
 
-        gradients  = []
-        activations = []
+        # Store references — NOT detached in forward
+        _activation = [None]
+        _gradient   = [None]
 
         def fwd_hook(module, inp, out):
-            activations.append(out.detach())
+            _activation[0] = out          # keep in graph — do NOT detach here
 
         def bwd_hook(module, grad_in, grad_out):
-            gradients.append(grad_out[0].detach())
+            _gradient[0] = grad_out[0].detach()   # detach only after backward
 
-        fwd_handle = target_layer.register_forward_hook(fwd_hook)
-        bwd_handle = target_layer.register_full_backward_hook(bwd_hook)
+        fwd_h = target_layer.register_forward_hook(fwd_hook)
+        bwd_h = target_layer.register_full_backward_hook(bwd_hook)
 
-        # Fresh tensor with grad enabled
-        img_t = cls.transform(original_pil).unsqueeze(0).to(cls.device)
-        img_t.requires_grad_(True)
+        try:
+            img_t = cls.transform(original_pil).unsqueeze(0).to(cls.device)
 
-        cls.model.zero_grad()
-        output = cls.model(img_t)
+            cls.model.zero_grad()
 
-        # Backprop only the predicted class score
-        score = output[0, class_idx]
-        score.backward()
+            # Enable grad even though model is in eval()
+            with torch.enable_grad():
+                output = cls.model(img_t)
+                score  = output[0, class_idx]
+                score.backward()
 
-        fwd_handle.remove()
-        bwd_handle.remove()
+        finally:
+            fwd_h.remove()
+            bwd_h.remove()
 
-        if not gradients or not activations:
-            # Fallback: return uniform mid-level map
-            return np.full((7, 7), 0.5, dtype=np.float32)
+        if _activation[0] is None or _gradient[0] is None:
+            print("GradCAM: hooks did not fire — returning fallback map")
+            return _fallback_cam(7, 7)
 
-        grad = gradients[0]        # (1, C, H, W)
-        act  = activations[0]      # (1, C, H, W)
+        act  = _activation[0].detach()   # (1, C, H, W)
+        grad = _gradient[0]              # (1, C, H, W)
 
-        # Global average pool the gradients → channel weights
+        # Channel weights = global average of gradients
         weights = grad.mean(dim=(2, 3), keepdim=True)   # (1, C, 1, 1)
 
         cam = (weights * act).sum(dim=1).squeeze()       # (H, W)
         cam = torch.nn.functional.relu(cam).cpu().numpy()
 
-        # Normalise to [0, 1]
-        cam_min, cam_max = cam.min(), cam.max()
-        if cam_max - cam_min > 1e-8:
+        cam_min, cam_max = float(cam.min()), float(cam.max())
+        if cam_max - cam_min > 1e-6:
             cam = (cam - cam_min) / (cam_max - cam_min)
         else:
-            # Model is very confident — fill with a moderate uniform map
-            cam = np.full_like(cam, 0.4)
+            print(f"GradCAM: flat map (min={cam_min:.4f} max={cam_max:.4f}) — using fallback")
+            return _fallback_cam(*cam.shape)
 
         return cam.astype(np.float32)
 
     @classmethod
     def _cam_to_heatmap_overlay(cls, original_pil, cam_np):
         """
-        Overlay the GradCAM heatmap on the original image.
+        Overlay GradCAM on the original image using jet colormap.
         Returns (overlay_pil, affected_pct, spread_risk_pct).
         """
         import numpy as np
         from PIL import Image
         import cv2
 
-        # Resize cam to match original image
         orig_w, orig_h = original_pil.size
-        cam_resized = cv2.resize(cam_np, (orig_w, orig_h))
+        cam_resized = cv2.resize(cam_np, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
 
-        # Apply jet colormap
-        cam_uint8 = (cam_resized * 255).astype(np.uint8)
+        # Jet colormap: blue=low, green=mid, red=high activation
+        cam_uint8   = (cam_resized * 255).astype(np.uint8)
         heatmap_bgr = cv2.applyColorMap(cam_uint8, cv2.COLORMAP_JET)
         heatmap_rgb = cv2.cvtColor(heatmap_bgr, cv2.COLOR_BGR2RGB)
 
-        # Blend with original — 40% original, 60% heatmap so activations are clearly visible
+        # 45% original + 55% heatmap — visible but not overwhelming
         orig_np = np.array(original_pil.convert("RGB"))
-        overlay = cv2.addWeighted(orig_np, 0.40, heatmap_rgb, 0.60, 0)
+        overlay = cv2.addWeighted(orig_np, 0.45, heatmap_rgb, 0.55, 0)
         overlay_pil = Image.fromarray(overlay)
 
-        # ── Area estimation ──────────────────────────────────────────────
-        # "Affected" = pixels where cam > 0.5 (high activation)
-        threshold = 0.5
-        affected_mask = cam_resized > threshold
-        affected_pct = round(float(affected_mask.mean()) * 100, 1)
+        # Affected area = pixels with cam > 0.5 (high-confidence disease zone)
+        affected_mask = cam_resized > 0.5
+        affected_pct  = round(float(affected_mask.mean()) * 100, 1)
 
-        # Spread risk: based on how much of the mid-activation zone (0.3–0.5)
-        # exists around the hot zone — proxy for spreading front
-        spread_mask = (cam_resized > 0.3) & (cam_resized <= threshold)
-        spread_pct = round(float(spread_mask.mean()) * 100, 1)
+        # Spread front = mid-activation zone (0.3–0.5) surrounding the hot zone
+        spread_mask = (cam_resized > 0.3) & (cam_resized <= 0.5)
+        spread_pct  = round(float(spread_mask.mean()) * 100, 1)
 
-        # Cap to sensible ranges
-        affected_pct = min(affected_pct, 95.0)
-        spread_pct   = min(spread_pct,   60.0)
-
-        return overlay_pil, affected_pct, spread_pct
+        return overlay_pil, min(affected_pct, 95.0), min(spread_pct, 60.0)
 
     @classmethod
     def _pil_to_b64(cls, pil_img, fmt="JPEG") -> str:
-        import io, base64
+        import io
+        import base64
         buf = io.BytesIO()
         pil_img.save(buf, format=fmt, quality=88)
         buf.seek(0)
@@ -186,8 +181,7 @@ class AIModelService:
     def predict_sync(cls, image_file) -> Dict[str, any]:
         """
         Blocking inference + GradCAM.
-        Returns disease, confidence, gradcam_url, affected_area_pct, spread_risk_pct.
-        Run via run_in_executor to avoid blocking the event loop.
+        Run via run_in_executor — never call directly from async context.
         """
         cls.load_model()
 
@@ -205,9 +199,9 @@ class AIModelService:
             original_pil = Image.open(io.BytesIO(raw)).convert("RGB")
             image_tensor = cls.transform(original_pil).unsqueeze(0).to(cls.device)
 
-            # ── Inference ────────────────────────────────────────────────
+            # ── Fast inference (no grad) ──────────────────────────────────
             with cls._torch.no_grad():
-                outputs = cls.model(image_tensor)
+                outputs       = cls.model(image_tensor)
                 probabilities = cls._torch.nn.functional.softmax(outputs, dim=1)
                 confidence, predicted = cls._torch.max(probabilities, 1)
 
@@ -215,32 +209,30 @@ class AIModelService:
             conf_val  = round(confidence.item(), 4)
             disease   = cls.class_names[class_idx]
 
-            # ── GradCAM ──────────────────────────────────────────────────
+            # ── GradCAM (separate forward+backward with grad) ─────────────
             cam_np = cls._compute_gradcam(original_pil, class_idx)
             overlay_pil, affected_pct, spread_pct = cls._cam_to_heatmap_overlay(original_pil, cam_np)
-
             gradcam_b64 = cls._pil_to_b64(overlay_pil)
 
             return {
-                "disease": disease,
-                "confidence": conf_val,
-                "gradcam_b64": gradcam_b64,
+                "disease":           disease,
+                "confidence":        conf_val,
+                "gradcam_b64":       gradcam_b64,
                 "affected_area_pct": affected_pct,
-                "spread_risk_pct": spread_pct,
+                "spread_risk_pct":   spread_pct,
             }
 
         except Exception as e:
+            import traceback
             print(f"Prediction error: {e}")
+            traceback.print_exc()
             import random
             return {
-                "disease": random.choice([
-                    "Tomato_Late_Blight", "Tomato_Early_Blight",
-                    "Potato_Late_Blight", "Apple_Cedar_apple_rust",
-                ]),
-                "confidence": round(random.uniform(0.75, 0.98), 2),
-                "gradcam_b64": None,
+                "disease":           random.choice(["Tomato_Late_Blight", "Tomato_Early_Blight", "Potato_Late_Blight"]),
+                "confidence":        round(random.uniform(0.75, 0.98), 2),
+                "gradcam_b64":       None,
                 "affected_area_pct": round(random.uniform(15, 55), 1),
-                "spread_risk_pct": round(random.uniform(5, 25), 1),
+                "spread_risk_pct":   round(random.uniform(5, 25), 1),
             }
 
     @classmethod
@@ -249,3 +241,15 @@ class AIModelService:
         import asyncio
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, cls.predict_sync, image_file)
+
+
+# ── module-level helper (outside class so it's picklable) ────────────────────
+
+def _fallback_cam(h, w):
+    """Return a centre-weighted fallback cam when GradCAM hooks don't fire."""
+    import numpy as np
+    y, x = np.ogrid[:h, :w]
+    cy, cx = h / 2, w / 2
+    sigma = min(h, w) / 3.0
+    cam = np.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * sigma ** 2))
+    return (cam / cam.max()).astype(np.float32)

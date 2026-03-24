@@ -207,8 +207,8 @@ const ScanResultsPage = () => {
               </div>
 
               {result.image_url && !imgError && (
-                <div className="rounded-xl overflow-hidden border border-outline-variant/20 bg-surface-container-low group cursor-zoom-in">
-                  <img className="w-full h-auto max-h-64 object-cover transition-transform duration-700 group-hover:scale-105" src={result.image_url} alt={diseaseName} onError={() => setImgError(true)} />
+                <div className="rounded-xl overflow-hidden border border-outline-variant/20 bg-surface-container-low">
+                  <img className="w-full h-auto object-contain" src={result.image_url} alt={diseaseName} onError={() => setImgError(true)} />
                 </div>
               )}
             </div>
@@ -237,12 +237,12 @@ const ScanResultsPage = () => {
                   <div className="relative">
                     {heatTab === 'original' ? (
                       result.image_url
-                        ? <img src={result.image_url} alt="Original" className="w-full h-56 object-cover" />
-                        : <div className="w-full h-56 bg-surface-container-highest flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">image</span></div>
+                        ? <img src={result.image_url} alt="Original" className="w-full h-auto object-contain" />
+                        : <div className="w-full h-48 bg-surface-container-highest flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">image</span></div>
                     ) : (
                       result.gradcam_url
-                        ? <img src={result.gradcam_url} alt="GradCAM heatmap" className="w-full h-56 object-cover" />
-                        : <div className="w-full h-56 bg-surface-container-highest flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">blur_on</span></div>
+                        ? <img src={result.gradcam_url} alt="GradCAM heatmap" className="w-full h-auto object-contain" />
+                        : <div className="w-full h-48 bg-surface-container-highest flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-on-surface-variant">blur_on</span></div>
                     )}
                   </div>
                   <div className="px-4 py-3 flex items-center gap-3">
